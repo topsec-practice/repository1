@@ -14,13 +14,13 @@
 
 安装module：
 
-```
+```bash
 npm install
 ```
 
 运行：
 
-```
+```bash
 npm run dev
 ```
 

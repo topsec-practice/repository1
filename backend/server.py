@@ -121,7 +121,7 @@ def admin_info():
                 }
             }
 
-@app.get("/frontend/user/logout")
+@app.post("/frontend/user/logout")
 def admin_logout():
     return  {   "code":20000
             ,   "data":"success"
