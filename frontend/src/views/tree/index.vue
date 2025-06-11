@@ -1,78 +1,118 @@
 <template>
-  <div class="app-container">
-    <el-input v-model="filterText" placeholder="Filter keyword" style="margin-bottom:30px;" />
+  <div class="dashboard-container">
+    <!-- 顶部搜索框 -->
+    <div class="search-bar">
+      <el-input
+        v-model="filterText"
+        placeholder="搜索规则ID、策略ID、文件ID或用户ID"
+        clearable
+        style="width: 300px"
+        @input="handleSearch"
+      >
+        <template #append>
+          <el-button icon="el-icon-search" />
+        </template>
+      </el-input>
+    </div>
 
-    <el-tree
-      ref="tree2"
-      :data="data2"
-      :props="defaultProps"
-      :filter-node-method="filterNode"
-      class="filter-tree"
-      default-expand-all
+    <el-table
+      v-loading="listLoading"
+      :data="filteredMatches"
+      element-loading-text="加载中..."
+      border
+      fit
+      highlight-current-row
+    >
+      <el-table-column label="策略ID" prop="policy_id" width="180" align="center">
+        <template #default="{row}">
+          <el-tag>{{ row.policy_id }}</el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="规则ID" prop="rule_id" width="180" align="center" />
+
+      <el-table-column label="文件ID" prop="file_id" width="180" align="center" />
+
+      <el-table-column label="用户ID" prop="user_id" width="180" align="center" />
+    </el-table>
+
+    <el-pagination
+      background
+      layout="prev, pager, next"
+      :total="filteredTotal"
+      :page-size="pageSize"
+      @current-change="handlePageChange"
+      style="margin-top: 20px;"
     />
-
   </div>
 </template>
 
 <script>
-export default {
+import { getMatchesList } from '@/api/matches'
 
+export default {
+  name: 'MatchesList',
   data() {
     return {
       filterText: '',
-      data2: [{
-        id: 1,
-        label: 'user1',
-        children: [{
-          id: 4,
-          label: 'Level two 1-1',
-          children: [{
-            id: 9,
-            label: 'Level three 1-1-1'
-          }, {
-            id: 10,
-            label: 'Level three 1-1-2'
-          }]
-        }]
-      }, {
-        id: 2,
-        label: 'user2',
-        children: [{
-          id: 5,
-          label: 'Level two 2-1'
-        }, {
-          id: 6,
-          label: 'Level two 2-2'
-        }]
-      }, {
-        id: 3,
-        label: 'Level one 3',
-        children: [{
-          id: 7,
-          label: 'Level two 3-1'
-        }, {
-          id: 8,
-          label: 'Level two 3-2'
-        }]
-      }],
-      defaultProps: {
-        children: 'children',
-        label: 'label'
-      }
+      listLoading: false,
+      matchesList: [], // 从数据库获取的原始数据
+      filteredList: [], // 过滤后的完整列表
+      filteredMatches: [], // 当前页显示的数据
+      pageSize: 10
     }
   },
-  watch: {
-    filterText(val) {
-      this.$refs.tree2.filter(val)
+  computed: {
+    filteredTotal() {
+      return this.filteredList.length
     }
   },
-
+  created() {
+    this.fetchData()
+  },
   methods: {
-    filterNode(value, data) {
-      if (!value) return true
-      return data.label.indexOf(value) !== -1
+    fetchData() {
+      this.listLoading = true
+      getMatchesList().then(response => {
+        this.matchesList = response.data.items
+        this.filteredList = this.matchesList
+        this.handlePageChange(1)
+        this.listLoading = false
+      }).catch(() => {
+        this.listLoading = false
+      })
+    },
+    handleSearch() {
+      if (!this.filterText) {
+        this.filteredList = this.matchesList
+      } else {
+        const searchText = this.filterText.toLowerCase()
+        this.filteredList = this.matchesList.filter(item => {
+          return (
+            (item.policy_id && item.policy_id.toLowerCase().includes(searchText)) ||
+            (item.rule_id && item.rule_id.toLowerCase().includes(searchText)) ||
+            (item.file_id && item.file_id.toLowerCase().includes(searchText)) ||
+            (item.user_id && item.user_id.toLowerCase().includes(searchText))
+          )
+        })
+      }
+      this.handlePageChange(1) // 搜索后重置到第一页
+    },
+    handlePageChange(page) {
+      const start = (page - 1) * this.pageSize
+      const end = start + this.pageSize
+      this.filteredMatches = this.filteredList.slice(start, end)
     }
   }
 }
 </script>
 
+<style scoped>
+.dashboard-container {
+  padding: 20px;
+}
+
+.search-bar {
+  margin-bottom: 20px;
+}
+</style>

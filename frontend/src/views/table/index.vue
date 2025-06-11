@@ -13,32 +13,44 @@
           {{ scope.$index }}
         </template>
       </el-table-column>
-      <el-table-column label="FileName">
+
+      <el-table-column label="文件名和简介">
         <template slot-scope="scope">
           {{ scope.row.title }}
         </template>
       </el-table-column>
-      <el-table-column label="user" width="110" align="center">
+
+      <el-table-column label="user_id" width="110" align="center">
         <template slot-scope="scope">
           <span>{{ scope.row.author }}</span>
         </template>
       </el-table-column>
+
       <el-table-column label="ID" width="110" align="center">
+        <template slot-scope="scope">
+          {{ scope.row.id }}
+        </template>
+      </el-table-column>
+
+      <el-table-column class-name="status-col" label="md5" width="110" align="center">
+        <template slot-scope="scope">
+          {{ scope.row.md5 }}
+        </template>
+      </el-table-column>
+
+      <el-table-column class-name="status-col" label="敏感信息个数" width="110" align="center">
         <template slot-scope="scope">
           {{ scope.row.pageviews }}
         </template>
       </el-table-column>
-      <el-table-column class-name="status-col" label="危险等级" width="110" align="center">
-        <template slot-scope="scope">
-          <el-tag :type="scope.row.status | statusFilter">{{ scope.row.status }}</el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column align="center" prop="created_at" label="上传时间" width="200">
+
+      <el-table-column align="center" prop="created_at" label="发现时间" width="200">
         <template slot-scope="scope">
           <i class="el-icon-time" />
           <span>{{ scope.row.display_time }}</span>
         </template>
       </el-table-column>
+
     </el-table>
   </div>
 </template>
