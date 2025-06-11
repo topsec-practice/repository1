@@ -1,12 +1,19 @@
 import asyncio
 import json
 import uuid
+from pydantic import BaseModel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Dict, List
 from datetime import datetime, timedelta
 import uvicorn
+import pymysql
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+from fastapi import FastAPI, Depends
+
 
 app = FastAPI()
 origins = [
@@ -22,86 +29,31 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 存储在线客户端连接
-active_connections: Dict[str, WebSocket] = {}
-# 存储客户端状态（如最后心跳时间）
-client_status: Dict[str, Dict] = {}
 
-# 心跳超时时间（秒）
-HEARTBEAT_TIMEOUT = 30
+# 数据库配置
+DATABASE_URL = "mysql+pymysql://root:yjydmm520@localhost/test"
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-@app.websocket("/ws/{client_id}")
-async def websocket_endpoint(websocket: WebSocket, client_id: str):
-    await websocket.accept()
-    active_connections[client_id] = websocket
-    client_status[client_id] = {
-        "last_heartbeat": datetime.now(),
-        "policy_version": None
-    }
-    print(f"Client {client_id} connected")
-
+# 添加数据库依赖
+def get_db():
+    db = SessionLocal()
     try:
-        while True:
-            data = await websocket.receive_text()
-            message = json.loads(data)
-            msg_type = message.get("type")
-
-            if msg_type == "heartbeat":
-                client_status[client_id]["last_heartbeat"] = datetime.now()
-                client_status[client_id]["policy_version"] = message.get("version")
-                await websocket.send_text(json.dumps({"status": "ok"}))
-
-            elif msg_type == "file_report":
-                print(f"Received file report from {client_id}: {message.get('changes')}")
-                await websocket.send_text(json.dumps({"status": "received"}))
-
-            elif msg_type == "ack_policy":
-                print(f"Client {client_id} confirmed policy {message.get('policy_id')}")
-
-            # 可扩展更多消息类型...
-
-    except WebSocketDisconnect:
-        print(f"Client {client_id} disconnected")
-        active_connections.pop(client_id, None)
-        client_status.pop(client_id, None)
-
-@app.post("/send_policy/{client_id}")
-async def send_policy(client_id: str):
-    if client_id not in active_connections:
-        return {"error": "client not connected"}
-
-    policy = {
-        "type": "policy_update",
-        "policy_id": f"policy_{uuid.uuid4()}",
-        "content": {
-            "rules": ["*.key", "*.conf", "/etc/passwd"]
-        }
-    }
-    try:
-        await active_connections[client_id].send_text(json.dumps(policy))
-        return {"status": "sent", "policy_id": policy["policy_id"]}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-@app.get("/status")
-def get_client_status():
-    now = datetime.now()
-    return {
-        cid: {
-            "last_heartbeat": str(info["last_heartbeat"]),
-            "status": "online" if now - info["last_heartbeat"] < timedelta(seconds=HEARTBEAT_TIMEOUT) else "offline",
-            "policy_version": info["policy_version"]
-        }
-        for cid, info in client_status.items()
-    }
+        yield db
+    finally:
+        db.close()
 
 @app.get("/")
 def index():
     return 'Hello World!'
 
+class admin_login_Item(BaseModel):
+    username: str
+    password: str
+
 @app.post("/frontend/user/login")
-def admin_login():
+def admin_login(req:admin_login_Item):
+    print(req)
     return  {   "code": 20000
             ,   "data":
                 {   "token": "admin-token"
@@ -121,74 +73,207 @@ def admin_info():
                 }
             }
 
-@app.get("/frontend/user/logout")
+@app.post("/frontend/user/logout")
 def admin_logout():
     return  {   "code":20000
             ,   "data":"success"
             }
 
 @app.get("/frontend/table/list")
-def table_list():
-    return  {   "code": 20000
-            ,   "data":
-                {   "total": 3
-                ,   "items":
-                    [   {   "id": "710000198110032753"
-                        ,   "title": "Nfkwyzic cliqkwfey rnds ojovjvc ygjnhvrz lswplim qqid kdwkrpwqj vbdkttl dmwjonwqye ttfe."
-                        ,   "status": "draft"
-                        ,   "author": "name"
-                        ,   "display_time": "1978-12-19 23:54:55"
-                        ,   "pageviews": 4140
-                        }
-                    ,   {
-                            "id": "210000197712046498",
-                            "title": "Qalm vjfnxrwe yignld coxhqmonv nfvgpgaty zjxy higxrpww lvbbjvrzv uuiddzv gfugwno bzkj qthntayo lbdg fumtrqne otjsu bksq bwqy vpz otonvqbu.",
-                            "status": "deleted",
-                            "author": "name",
-                            "display_time": "1985-11-12 10:20:29",
-                            "pageviews": 3484
-                        }
-                    ,   {
-                            "id": "230000199408228118",
-                            "title": "Keew ucjsksrw uhhzmys vvsyo extwvlmepu vkluygk cqw cvbpxhbea ojoiwpih skbu slkbxr mqh zgqvkthcs mpyt byfuopocs komvxnk wvgudsuo nmczoe odfnkixl llufdhdf.",
-                            "status": "published",
-                            "author": "name",
-                            "display_time": "1999-05-28 12:26:41",
-                            "pageviews": 2559
-                        }
-                    ]
-                }
+def table_list(db = Depends(get_db)):
+    # 查询数据库获取文件列表（仅从files表）
+    query = text("""
+        SELECT 
+            file_id as id,
+            file_name as title,
+            user_id,
+            count as pageviews,
+            discovery_time as display_time,
+            md5
+        FROM files
+    """)
+    
+    result = db.execute(query)
+    files = []
+    for row in result:
+        files.append({
+            "id": row.id,
+            "title": row.title,
+            "author": row.user_id,  # 使用实际的user_id作为author
+            "pageviews": row.pageviews,
+            "display_time": row.display_time.strftime("%Y-%m-%d %H:%M:%S") if row.display_time else None,
+            "md5": row.md5
+        })
+    
+    return {
+        "code": 20000,
+        "data": {
+            "total": len(files),
+            "items": files
+        }
+    }
+
+# 修改后的statusinfo函数
+@app.get("/frontend/statusinfo")
+def statusinfo(db = Depends(get_db)):
+    # 查询数据库获取用户状态
+    query = text("""
+        SELECT user_id as id, user_name as name, status, 
+               LastEchoTime, LastScanTime, IP, user_key
+        FROM user
+    """)
+    
+    result = db.execute(query)
+    users = []
+    for row in result:
+        users.append({
+            "id": row.id,
+            "name": row.name,
+            "status": row.status,
+            "LastEchoTime": row.LastEchoTime.strftime("%Y-%m-%d %H:%M:%S") if row.LastEchoTime else None,
+            "LastScanTime": row.LastScanTime.strftime("%Y-%m-%d %H:%M:%S") if row.LastScanTime else None,
+            "IP": row.IP,
+            "key": row.user_key
+        })
+    
+    return {
+        "code": 20000,
+        "data": {
+            "total": len(users),
+            "items": users
+        }
+    }
+
+class strategy_Item(BaseModel):
+    strategy: str
+
+@app.post("/frontend/strategy/submit")
+def strategy_submit(req: strategy_Item, db = Depends(get_db)):
+    # 生成唯一的policy_id
+    policy_id = str(uuid.uuid4())
+    
+    # 检查policy_id是否已存在（虽然UUID冲突概率极低，但为了安全还是检查）
+    check_query = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
+    while db.execute(check_query, {"policy_id": policy_id}).fetchone():
+        policy_id = str(uuid.uuid4())  # 如果冲突，重新生成
+    
+    # 插入策略到数据库
+    insert_query = text("""
+        INSERT INTO policy (policy_id, policy_description)
+        VALUES (:policy_id, :policy_description)
+    """)
+    
+    try:
+        db.execute(insert_query, {
+            "policy_id": policy_id,
+            "policy_description": req.strategy
+        })
+        db.commit()
+        return {
+            "code": 20000,
+            "data": {
+                "message": "策略提交成功",
+                "policy_id": policy_id
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        return {
+            "code": 50000,
+            "message": f"策略提交失败: {str(e)}"
+        }
+
+@app.post("/frontend/strategy/statu")
+def strategy_submit():
+    return  {   "code":20000
+            ,   "data":"success"
             }
 
-@app.get("/frontend/statusinfo")
-def statusinfo():
-    return  {   "code": 20000
-            ,   "data":
-                {   "total": 5
-                ,   "items":
-                    [   {   "id": 1001
-                        ,   "name": "张三"
-                        ,   "status": "在线"
-                        }
-                    ,   {   "id": 1002
-                        ,   "name": "李四"
-                        ,   "status": "离线"
-                        }
-                    ,   {   "id": 1003
-                        ,   "name": "王五"
-                        ,   "status": "在线"
-                        }
-                    ,   {   "id": 1004
-                        ,   "name": "赵六"
-                        ,   "status": "离线"
-                        }
-                    ,   {   "id": 1005
-                        ,   "name": "钱七"
-                        ,   "status": "在线"
-                        }
-                    ]
-                }
-            }
+@app.get("/frontend/matches/list")
+# def matches_list(
+#     search: str = None,  # 添加搜索参数
+#     db = Depends(get_db)
+# ):
+def matches_list(db = Depends(get_db)):
+    # 基础查询
+    query = text("""
+        SELECT 
+            policy_id,
+            file_id,
+            rule_id,
+            user_id
+        FROM matches
+    """)
+    
+    # 添加搜索条件
+    # params = {}
+    # if search:
+    #     query = text(f"""
+    #         {query}
+    #         AND (policy_id LIKE :search 
+    #         OR file_id LIKE :search 
+    #         OR rule_id LIKE :search 
+    #         OR user_id LIKE :search)
+    #     """)
+    #     params["search"] = f"%{search}%"
+    
+    result = db.execute(query)
+    matches = []
+    for row in result:
+        matches.append({
+            "rule_id": row.rule_id,
+            "policy_id": row.policy_id,
+            "file_id": row.file_id,
+            "user_id": row.user_id,
+        })
+    
+    return {
+        "code": 20000,
+        "data": {
+            "total": len(matches),
+            "items": matches
+        }
+    }
+
+
+@app.get("/frontend/policy/list")
+def policy_list(
+    search: str = None,  # 可选搜索参数
+    db = Depends(get_db)
+):
+    # 基础查询
+    query = text("""
+        SELECT 
+            policy_id,
+            policy_description
+        FROM policy
+    """)
+    
+    # 添加搜索条件
+    params = {}
+    if search:
+        query = text(f"""
+            {query}
+            WHERE policy_id LIKE :search 
+            OR policy_description LIKE :search
+        """)
+        params["search"] = f"%{search}%"
+    
+    result = db.execute(query, params)
+    policies = []
+    for row in result:
+        policies.append({
+            "policy_id": row.policy_id,
+            "description": row.policy_description,
+        })
+    
+    return {
+        "code": 20000,
+        "data": {
+            "total": len(policies),
+            "items": policies
+        }
+    }
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=6099)
