@@ -1,85 +1,97 @@
 <template>
   <div class="app-container">
-    <el-form ref="form" :model="form" label-width="120px">
-      <el-form-item label="Activity name">
-        <el-input v-model="form.name" />
-      </el-form-item>
-      <el-form-item label="Activity zone">
-        <el-select v-model="form.region" placeholder="please select your zone">
-          <el-option label="Zone one" value="shanghai" />
-          <el-option label="Zone two" value="beijing" />
-        </el-select>
-      </el-form-item>
-      <el-form-item label="Activity time">
-        <el-col :span="11">
-          <el-date-picker v-model="form.date1" type="date" placeholder="Pick a date" style="width: 100%;" />
-        </el-col>
-        <el-col :span="2" class="line">-</el-col>
-        <el-col :span="11">
-          <el-time-picker v-model="form.date2" type="fixed-time" placeholder="Pick a time" style="width: 100%;" />
-        </el-col>
-      </el-form-item>
-      <el-form-item label="Instant delivery">
-        <el-switch v-model="form.delivery" />
-      </el-form-item>
-      <el-form-item label="Activity type">
-        <el-checkbox-group v-model="form.type">
-          <el-checkbox label="Online activities" name="type" />
-          <el-checkbox label="Promotion activities" name="type" />
-          <el-checkbox label="Offline activities" name="type" />
-          <el-checkbox label="Simple brand exposure" name="type" />
-        </el-checkbox-group>
-      </el-form-item>
-      <el-form-item label="Resources">
-        <el-radio-group v-model="form.resource">
-          <el-radio label="Sponsor" />
-          <el-radio label="Venue" />
-        </el-radio-group>
-      </el-form-item>
-      <el-form-item label="Activity form">
-        <el-input v-model="form.desc" type="textarea" />
-      </el-form-item>
-      <el-form-item>
-        <el-button type="primary" @click="onSubmit">Create</el-button>
-        <el-button @click="onCancel">Cancel</el-button>
-      </el-form-item>
-    </el-form>
+    <el-card class="box-card">
+      <div slot="header" class="clearfix">
+        <span>策略提交</span>
+      </div>
+      
+      <el-form ref="form" :model="form" :rules="rules" label-width="100px">
+        <el-form-item label="策略内容" prop="strategy">
+          <el-input
+            v-model="form.strategy"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入您的策略"
+            clearable
+          ></el-input>
+        </el-form-item>
+        
+        <el-form-item>
+          <el-button 
+            type="primary" 
+            :loading="submitting"
+            @click="submitForm"
+          >
+            提交策略
+          </el-button>
+          <el-button @click="resetForm">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
   </div>
 </template>
 
 <script>
+import { submitStrategy } from '@/api/Strategy'// 导入API请求方法
+
 export default {
+  name: 'StrategySubmit',
   data() {
     return {
       form: {
-        name: '',
-        region: '',
-        date1: '',
-        date2: '',
-        delivery: false,
-        type: [],
-        resource: '',
-        desc: ''
-      }
+        strategy: ''
+      },
+      rules: {
+        strategy: [
+          { required: true, message: '请输入策略内容', trigger: 'blur' },
+          { max: 200, message: '策略内容不能超过200个字符', trigger: 'blur' }
+        ]
+      },
+      submitting: false
     }
   },
   methods: {
-    onSubmit() {
-      this.$message('submit!')
-    },
-    onCancel() {
-      this.$message({
-        message: 'cancel!',
-        type: 'warning'
+    submitForm() {
+      this.$refs.form.validate(valid => {
+        if (valid) {
+          this.submitting = true
+          
+          // 调用API提交策略
+          submitStrategy(this.form.strategy)
+            .then(response => {
+              this.$message.success('策略提交成功！')
+              this.resetForm()
+            })
+            .catch(error => {
+              console.error('提交失败:', error)
+              this.$message.error('策略提交失败，请重试')
+            })
+            .finally(() => {
+              this.submitting = false
+            })
+        } else {
+          return false
+        }
       })
+    },
+    resetForm() {
+      this.$refs.form.resetFields()
     }
   }
 }
 </script>
 
 <style scoped>
-.line{
-  text-align: center;
+.box-card {
+  max-width: 800px;
+  margin: 20px auto;
+}
+.clearfix:before,
+.clearfix:after {
+  display: table;
+  content: "";
+}
+.clearfix:after {
+  clear: both;
 }
 </style>
-

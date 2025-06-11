@@ -1,6 +1,7 @@
 import asyncio
 import json
 import uuid
+from pydantic import BaseModel
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -83,7 +84,6 @@ async def send_policy(client_id: str):
     except Exception as e:
         return {"error": str(e)}
 
-
 @app.get("/status")
 def get_client_status():
     now = datetime.now()
@@ -100,8 +100,13 @@ def get_client_status():
 def index():
     return 'Hello World!'
 
+class admin_login_Item(BaseModel):
+    username: str
+    password: str
+
 @app.post("/frontend/user/login")
-def admin_login():
+def admin_login(req:admin_login_Item):
+    print(req)
     return  {   "code": 20000
             ,   "data":
                 {   "token": "admin-token"
@@ -188,6 +193,22 @@ def statusinfo():
                         }
                     ]
                 }
+            }
+
+class strategy_Item(BaseModel):
+    strategy: str
+
+@app.post("/frontend/strategy/submit")
+def strategy_submit(req:strategy_Item):
+    # print(req)
+    return  {   "code":20000
+            ,   "data":"success"
+            }
+
+@app.post("/frontend/strategy/statu")
+def strategy_submit():
+    return  {   "code":20000
+            ,   "data":"success"
             }
 
 if __name__ == "__main__":
