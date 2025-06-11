@@ -2,7 +2,6 @@ import pymysql
  
 
 
-
 def upload(db, cursor, user_id, files):
     try:
         for file in files:
@@ -140,6 +139,8 @@ def get_all_users(cursor, admin_id):
     except Exception as e:
         print(f"Error: {e}")
         return []
+
+
 
 if __name__ == "__main__":
     db = pymysql.connect(
