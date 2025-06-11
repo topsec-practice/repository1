@@ -8,6 +8,8 @@ import asyncio
 from multiprocessing import Process, Manager
 from typing import Dict
 import uvicorn
+import pymysql
+import sql
 
 # -------------------------- 配置 --------------------------
 
@@ -16,9 +18,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("UnifiedServer")
 
 # 安全配置
-ALLOWED_IPS = {'127.0.0.1', '192.168.1.100'}
+ALLOWED_IPS = {'127.0.0.1', '192.168.1.100'}       # ip白名单
 API_KEY = "secure-api-key-123"
-RATE_LIMIT_SECONDS = 5
+RATE_LIMIT_SECONDS = 5                             # 频率最大： 距上次时间
 
 # 管理数据结构
 
@@ -26,16 +28,30 @@ RATE_LIMIT_SECONDS = 5
 rate_limit = {}
 active_connections: Dict[str, WebSocket] = {}
 
+# 连接数据库
+
+db = pymysql.connect(
+    host="localhost", 
+    user="root", 
+    password="123456",
+    database="trx"
+)
+
+cursor=db.cursor()
+
 # -------------------------- 通用工具函数 --------------------------
 
+# 检查用户名是否合理
 def check_auth(request: Request):
     auth = request.headers.get('Authorization')
     return auth == f"Bearer {API_KEY}"
 
+# 检查ip是否正常
 def check_ip(request: Request):
     ip = request.client.host
     return ip in ALLOWED_IPS
 
+# 频率检测
 def rate_limit_check(ip):
     now = time.time()
     if ip in rate_limit and now - rate_limit[ip] < RATE_LIMIT_SECONDS:
@@ -47,7 +63,8 @@ def rate_limit_check(ip):
 
 def create_rest_app(clients):
     rest_app = FastAPI()
-        
+    
+    # 注册
     @rest_app.post("/api/register")
     async def register(request: Request):
         if not check_auth(request) or not check_ip(request):
@@ -69,10 +86,13 @@ def create_rest_app(clients):
             "user_id": user_id,
             "register_time": now_time
         }
+        
+        sql.update_user_status(db,cursor,user_id,"online",now_time)
         logger.info(f"[REGISTER] Client {user_id} ({ip}) registered and online.")
         logger.info(f"Current clients: {clients}")
         return {"status": "success", "message": "Client registered and online", "user_id": user_id}
 
+    # 上线
     @rest_app.post("/api/online")
     async def online(request: Request):
         if not check_auth(request) or not check_ip(request):
@@ -94,9 +114,12 @@ def create_rest_app(clients):
             "user_id": user_id,
             "register_time": clients[ip].get("register_time") if ip in clients else now_time
         }
+
+        sql.update_user_status(db,cursor,user_id,"online",now_time)
         logger.info(f"[ONLINE] Client {user_id} ({ip}) is online and heartbeat updated.")
         return {"status": "success", "message": "Client online and heartbeat updated", "user_id": user_id}
 
+    # 心跳
     @rest_app.post("/api/heartbeat")
     async def heartbeat(request: Request):
         if not check_auth(request) or not check_ip(request):
@@ -111,13 +134,16 @@ def create_rest_app(clients):
         if not user_id:
             return JSONResponse(status_code=400, content={"status": "error", "message": "Missing user_id"})
 
-        now_time = datetime.now().isoformat()
+        realnow = datetime.now()
+        now_time = realnow.isoformat()
         clients[ip] = {
             "last_heartbeat": now_time,
             "online": True,
             "user_id": user_id,
             "register_time": clients[ip].get("register_time") if ip in clients else now_time
         }
+
+        sql.update_user_status(db,cursor,user_id,"online",realnow.strftime("%Y-%m-%d %H:%M:%S"))
         logger.info(f"[HEARTBEAT] Client {user_id} ({ip}) heartbeat received.")
         return {
             "status": "success",
@@ -127,12 +153,12 @@ def create_rest_app(clients):
             "last_heartbeat": clients[ip]["last_heartbeat"]
         }
 
-    @rest_app.get("/api/status")
-    async def status(request: Request):
-        ip = request.client.host
-        if not check_auth(request) or ip not in clients:
-            return JSONResponse(status_code=404, content={"status": "error", "message": "Not found"})
-        return {"status": "success", "client_status": clients[ip]}
+    # @rest_app.get("/api/status")
+    # async def status(request: Request):
+    #     ip = request.client.host
+    #     if not check_auth(request) or ip not in clients:
+    #         return JSONResponse(status_code=404, content={"status": "error", "message": "Not found"})
+    #     return {"status": "success", "client_status": clients[ip]}
     
     return rest_app
 
@@ -171,11 +197,14 @@ def create_ws_app(clients):
     async def push_policy(user_id: str):
         if user_id not in active_connections:
             return {"status": "error", "message": "Client not connected"}
+        
+        policy_id=sql.get_max_policyid(cursor)[0][0]
+        rules=sql.get_all_rules(cursor,policy_id)
 
         policy_data = {
             "type": "policy_update",
-            "policy_id": f"policy_{int(time.time())}",
-            "rules": ["*.conf", "/etc/passwd"]
+            "policy_id": policy_id,
+            "rules": rules
         }
         try:
             await active_connections[user_id].send_text(json.dumps(policy_data))

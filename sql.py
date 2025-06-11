@@ -30,6 +30,17 @@ def upload(db, cursor, user_id, files):
         print(f"Error: {e}")
         db.rollback()
 
+def update_user_status(db, cursor, user_id, status, LastEchoTime):
+    try:
+        sql="UPDATE user SET status = %s, LastEchoTime = %s WHERE user_id = %s"
+        # print(sql%(status,LastEchoTime,user_id))
+        cursor.execute(sql,(status, LastEchoTime, user_id))
+        db.commit()
+        print("update user status success")
+    except Exception as e:
+        print(f"Error: {e}")
+        db.rollback()
+
 
 def delete_file(db, cursor, file_id, user_id, policy_id):
     try:
@@ -109,6 +120,16 @@ def insert_rule(db, cursor, rule_id, policy_id, rule_description):
     except Exception as e:
         print(f"Error: {e}")
         db.rollback()
+
+def get_max_policyid(cursor):
+    try:
+        sql = "SELECT max(policy_id) FROM policy"
+        cursor.execute(sql)
+        results = cursor.fetchall()
+        return results
+    except Exception as e:
+        print(f"Error: {e}")
+        return []
 
 def get_all_policies(cursor):
     try:
