@@ -42,7 +42,6 @@ def callback(ch, method, properties, body):
             cursor.execute("DELETE FROM matches WHERE user_id = %s", (user_id,))
             cursor.execute("DELETE FROM files WHERE user_id = %s", (user_id,))
             print(f" [i] 已删除 user_id = {user_id} 所有文件和匹配记录")
-            insert_file_and_matches(data)  # 插入新文件和匹配记录
 
         elif flag == 1:
             # 更新指定文件及其匹配记录
