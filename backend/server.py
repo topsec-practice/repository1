@@ -275,5 +275,37 @@ def policy_list(
         }
     }
 
+
+#规则展示页面的查询
+@app.get("/frontend/rules/list")
+def rules_list(
+    policy_id: str,  # 必选参数
+    db = Depends(get_db)
+):
+    # 查询特定policy_id的所有规则
+    query = text("""
+        SELECT 
+            rule_id,
+            rule_description
+        FROM rules
+        WHERE policy_id = :policy_id
+    """)
+    
+    result = db.execute(query, {"policy_id": policy_id})
+    rules = []
+    for row in result:
+        rules.append({
+            "rule_id": row.rule_id,
+            "rule_description": row.rule_description,
+        })
+    
+    return {
+        "code": 20000,
+        "data": {
+            "total": len(rules),
+            "items": rules
+        }
+    }
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=6099)

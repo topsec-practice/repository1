@@ -160,6 +160,13 @@ export const constantRoutes = [
   //   ]
   // },
 
+{
+  path: '/rules',
+  component: () => import('@/views/rule/rule'),
+  hidden: true
+},
+
+
   // 404 page must be placed at the end !!!
   { path: '*', redirect: '/404', hidden: true }
 ]
