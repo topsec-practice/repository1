@@ -1,0 +1,9 @@
+fastapi
+pika
+pydantic
+PyMySQL
+Requests
+rstream
+SQLAlchemy
+websockets
+uvicorn

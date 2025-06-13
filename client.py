@@ -11,8 +11,8 @@ USER_ID = "user001"
 USER_ID = "test-client-01"
 
 REST_URL_BASE = "http://127.0.0.1:5000/api"
-PUSH_URL = f"http://127.0.0.1:6099/push_policy/{USER_ID}"
-WS_URL = f"ws://127.0.0.1:6099/ws/{USER_ID}"
+PUSH_URL = f"http://127.0.0.1:6100/push_policy/{USER_ID}"
+WS_URL = f"ws://127.0.0.1:6100/ws/{USER_ID}"
 HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 
 

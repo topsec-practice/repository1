@@ -224,7 +224,7 @@ def start_rest(clients):
 
 def start_ws(clients):
     ws_app = create_ws_app(clients)
-    uvicorn.run(ws_app, host="0.0.0.0", port=6099)
+    uvicorn.run(ws_app, host="0.0.0.0", port=6100)
 
 if __name__ == '__main__':
     from multiprocessing import freeze_support
