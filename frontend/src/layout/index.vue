@@ -8,19 +8,22 @@
       </div>
       <app-main />
     </div>
+    <ChatCopilot />
   </div>
 </template>
 
 <script>
 import { Navbar, Sidebar, AppMain } from './components'
 import ResizeMixin from './mixin/ResizeHandler'
+import ChatCopilot from '@/components/ChatCopilot.vue'
 
 export default {
   name: 'Layout',
   components: {
     Navbar,
     Sidebar,
-    AppMain
+    AppMain,
+    ChatCopilot
   },
   mixins: [ResizeMixin],
   computed: {
