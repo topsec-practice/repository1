@@ -8,35 +8,62 @@
     >
       <svg width="28" height="28" viewBox="0 0 28 28">
         <circle cx="14" cy="14" r="14" fill="#22223B"/>
-        <text x="14" y="19" text-anchor="middle" font-size="14" fill="#fff" font-family="Arial">信</text>
+        <text x="14" y="19" text-anchor="middle" font-size="14" fill="#fff" font-family="Arial, sans-serif">信</text>
       </svg>
     </button>
+
     <transition name="slide">
       <div v-if="visible" class="copilot-sidebar">
         <div class="copilot-header">
           <span>天融信 AI 助手 · 小信</span>
           <button class="close-btn" @click="toggleSidebar" aria-label="关闭">×</button>
         </div>
+
         <div class="copilot-messages" ref="messages">
           <div v-if="!chatHistory.length && !streaming" class="welcome-message">
             <div class="welcome-logo">信</div>
             <p>你好，我是小信，天融信的 AI 助手。</p>
             <p class="welcome-suggestion">可以向我提问网络安全基础知识和产品文档等问题哦 ~</p>
           </div>
+
           <div
             v-for="(msg, idx) in chatHistory"
             :key="idx"
-            :class="['copilot-message', msg.role]"
+            :class="['copilot-message-wrapper', msg.role, { 'error-wrapper': msg.isError }]"
           >
-            <span class="role">{{ msg.role === 'user' ? '我' : '小信' }}：</span>
-            <span class="content" v-html="renderMarkdown(msg.content)"></span>
+            <div class="copilot-message">
+              <span class="role">{{ msg.role === 'user' ? '我' : '小信' }}：</span>
+              <span class="content" v-html="renderMarkdown(msg.content)"></span>
+            </div>
+            
+            <div v-if="msg.role === 'assistant' && msg.sources && msg.sources.length" class="copilot-sources-container">
+              <button @click="toggleSources(msg)" class="toggle-sources-btn">
+                {{ msg.sourcesVisible ? '收起引用来源' : '展开引用来源' }}
+                <span :class="['arrow', { 'expanded': msg.sourcesVisible }]">›</span>
+              </button>
+              <transition name="fade">
+                <div v-if="msg.sourcesVisible" class="copilot-sources">
+                  <ul>
+                    <li v-for="(source, s_idx) in msg.sources" :key="s_idx">
+                      <a :href="getDownloadUrl(source.filename)" target="_blank" rel="noopener noreferrer">
+                        📄 {{ source.filename }}
+                      </a>
+                    </li>
+                  </ul>
+                </div>
+              </transition>
+            </div>
           </div>
-          <div v-if="streaming" class="copilot-message assistant">
-            <span class="role">小信：</span>
-            <span class="content" v-html="renderMarkdown(streamContent)"></span>
-            <span class="streaming-cursor">▋</span>
+
+          <div v-if="streaming" class="copilot-message-wrapper assistant">
+             <div class="copilot-message">
+                <span class="role">小信：</span>
+                <span class="content" v-html="renderMarkdown(streamContent)"></span>
+                <span class="streaming-cursor">▋</span>
+            </div>
           </div>
         </div>
+
         <div class="copilot-input-area">
           <input
             v-model="userInput"
@@ -64,6 +91,7 @@ export default {
     return {
       visible: false,
       userInput: "",
+      // chatHistory中的对象结构: { role, content, sources?, isError?, sourcesVisible? }
       chatHistory: [],
       streaming: false,
       streamContent: "",
@@ -74,19 +102,25 @@ export default {
     toggleSidebar() {
       this.visible = !this.visible;
       if (this.visible) {
-        this.$nextTick(() => {
-          this.scrollToBottom();
-        });
+        this.scrollToBottom();
       }
     },
+
     scrollToBottom() {
       this.$nextTick(() => {
         const el = this.$refs.messages;
         if (el) el.scrollTop = el.scrollHeight;
       });
     },
+
+    // 新增：切换引用来源的显示/隐藏
+    toggleSources(message) {
+        message.sourcesVisible = !message.sourcesVisible;
+    },
+
     async sendMessage() {
       if (!this.userInput.trim() || this.streaming) return;
+      
       const input = this.userInput.trim();
       this.chatHistory.push({ role: "user", content: input });
       this.userInput = "";
@@ -94,8 +128,7 @@ export default {
       this.streamContent = "";
       this.scrollToBottom();
 
-      // 构造 payload
-      const payload = { messages: this.chatHistory };
+      const payload = { messages: this.chatHistory.filter(m => !m.isError) }; // 不将错误消息发送给后端
       const url = "http://127.0.0.1:16361/chat";
       this.abortController = new AbortController();
 
@@ -107,56 +140,54 @@ export default {
           signal: this.abortController.signal,
         });
 
-        if (!response.body) throw new Error("无流式响应体");
+        if (!response.body) throw new Error("服务器未返回流式响应体");
+        if (!response.ok) throw new Error(`HTTP 错误! 状态: ${response.status}`);
 
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let done = false;
         let fullResponse = "";
+        let sources = [];
 
         while (!done) {
           const { value, done: doneReading } = await reader.read();
           done = doneReading;
           if (value) {
             const chunk = decoder.decode(value, { stream: true });
-            // 处理每一行
-            chunk.split(/\r?\n/).forEach(line => {
-              if (line.startsWith("data: ")) {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  if (data.type === "content") {
-                    const choices = data.choices || [];
-                    if (
-                      choices.length &&
-                      choices[0].delta &&
-                      choices[0].delta.content
-                    ) {
-                      const content = choices[0].delta.content;
-                      this.streamContent += content;
-                      fullResponse += content;
-                      this.scrollToBottom();
-                    }
+            const lines = chunk.split(/\r?\n/).filter(line => line.startsWith("data: "));
+            
+            for (const line of lines) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                if (data.type === "sources") {
+                  sources = data.sources || [];
+                } else if (data.type === "content") {
+                  const content = data.choices?.[0]?.delta?.content;
+                  if (content) {
+                    this.streamContent += content;
+                    fullResponse += content;
+                    this.scrollToBottom();
                   }
-                  if (data.type === "done") {
-                    done = true;
-                  }
-                  if (data.type === "error") {
-                    this.streamContent += "\n[错误] " + (data.error?.message || "未知错误");
-                    done = true;
-                  }
-                } catch (e) {
-                  // 忽略解析错误
+                } else if (data.type === "error") {
+                  this.chatHistory.push({ role: "assistant", content: data.error?.message || "发生未知错误", isError: true });
+                  done = true;
+                } else if (data.type === "done") {
+                  done = true;
                 }
+              } catch (e) {
+                console.error("解析SSE数据时出错:", line, e);
               }
-            });
+            }
           }
         }
-        // 流式结束，加入历史
+        
         if (fullResponse) {
-          this.chatHistory.push({ role: "assistant", content: fullResponse });
+          this.chatHistory.push({ role: "assistant", content: fullResponse, sources: sources, sourcesVisible: false });
         }
       } catch (err) {
-        this.streamContent += "\n[网络错误] " + (err.message || err);
+        if (err.name !== 'AbortError') {
+          this.chatHistory.push({ role: "assistant", content: `网络连接失败: ${err.message}. 请检查后端服务是否正在运行。`, isError: true });
+        }
       } finally {
         this.streaming = false;
         this.streamContent = "";
@@ -164,35 +195,19 @@ export default {
         this.scrollToBottom();
       }
     },
+
+    getDownloadUrl(filename) {
+      return `http://127.0.0.1:16361/download?filename=${encodeURIComponent(filename)}`;
+    },
+
     renderMarkdown(text) {
       if (!text) return '';
-      
-      // 转义HTML特殊字符（防止XSS）
-      let html = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-      
-      // 处理Markdown语法
-      // 加粗 **text** 或 __text__
-      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-      html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
-      
-      // 斜体 *text* 或 _text_
-      html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
-      html = html.replace(/_(.*?)_/g, '<em>$1</em>');
-      
-      // 行内代码 `code`
+      let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/__(.*?)__/g, '<strong>$1</strong>');
+      html = html.replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/_(.*?)_/g, '<em>$1</em>');
       html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-      
-      // 处理换行
-      html = html.replace(/\n/g, '<br>');
-      
-      // 处理链接 [text](url)
       html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
-      
+      html = html.replace(/\n/g, '<br>');
       return html;
     },
   },
@@ -200,201 +215,116 @@ export default {
 </script>
 
 <style scoped>
-/* 新增：欢迎信息样式 */
-.welcome-message {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  text-align: center;
-  color: #555;
-}
-.welcome-logo {
-  width: 60px;
-  height: 60px;
-  line-height: 60px;
-  border-radius: 50%;
-  background: #22223b;
-  color: #fff;
-  font-size: 28px;
-  font-weight: bold;
-  margin-bottom: 20px;
-}
-.welcome-suggestion {
-  color: #888;
-  font-size: 14px;
-}
-
-
-/* 原有样式（稍作调整） */
-.copilot-btn {
-  position: fixed;
-  right: 32px;
-  bottom: 32px;
-  z-index: 2000;
-  background: #22223b;
-  border: none;
-  border-radius: 50%;
-  width: 56px;
-  height: 56px;
-  box-shadow: 0 4px 16px rgba(34,34,59,0.18);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: box-shadow 0.2s;
-}
-.copilot-btn:hover {
-  box-shadow: 0 8px 32px rgba(34,34,59,0.28);
-}
-
-.copilot-sidebar {
-  position: fixed;
-  top: 0;
-  right: 0;
-  width: 380px;
-  height: 100vh;
-  background: #fff;
-  box-shadow: -2px 0 16px rgba(34,34,59,0.12);
-  z-index: 2100;
-  display: flex;
-  flex-direction: column;
-  animation: slideIn 0.3s;
-}
-@keyframes slideIn {
-  from { right: -400px; }
-  to { right: 0; }
-}
-.slide-enter-active, .slide-leave-active {
-  transition: all 0.3s;
-}
-.slide-enter, .slide-leave-to {
-  transform: translateX(100%);
-  opacity: 0;
-}
-
-.copilot-header {
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  border-bottom: 1px solid #eee;
-  font-weight: bold;
-  font-size: 18px;
-  background: #f7f7fb;
-  flex-shrink: 0; /* 防止头部被压缩 */
-}
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  color: #888;
-  cursor: pointer;
-  line-height: 1;
-  padding: 0 4px;
-}
-.close-btn:hover {
-  color: #22223b;
-}
-
+/* 消息区 */
 .copilot-messages {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 20px 12px 20px;
-  background: #f9f9fb;
+  padding: 18px 20px;
+  background: #fdfdfd;
 }
+
+/* 消息包装器，用于控制边距和错误状态 */
+.copilot-message-wrapper {
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: #f7f7fb;
+}
+.copilot-message-wrapper.user {
+  background-color: #e9efff;
+}
+/* 错误消息的红色框样式 */
+.copilot-message-wrapper.error-wrapper {
+  background-color: #fff2f2;
+  border: 1px solid #ffcccc;
+}
+.error-wrapper .role {
+  color: #d8000c !important;
+}
+
 .copilot-message {
-  margin-bottom: 12px;
   line-height: 1.7;
   word-break: break-word;
 }
-.copilot-message.user .role {
-  color: #3a86ff;
-  font-weight: bold;
+.copilot-message .role { font-weight: bold; }
+.copilot-message.user .role { color: #3a86ff; }
+.copilot-message.assistant .role { color: #22223b; }
+.copilot-message .content { margin-left: 4px; }
+
+/* 引用来源容器 */
+.copilot-sources-container {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e8eaf0;
 }
-.copilot-message.assistant .role {
-  color: #22223b;
+.toggle-sources-btn {
+  background: none;
+  border: none;
+  color: #555;
+  cursor: pointer;
+  font-size: 13px;
   font-weight: bold;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
 }
-.copilot-message .content {
+.toggle-sources-btn .arrow {
   margin-left: 4px;
+  transition: transform 0.2s;
+  display: inline-block;
+}
+.toggle-sources-btn .arrow.expanded {
+  transform: rotate(90deg);
 }
 
-/* Markdown样式 */
-.copilot-message .content strong {
-  font-weight: bold;
-  color: #22223b;
+/* 引用来源列表 */
+.copilot-sources {
+  margin-top: 8px;
 }
-
-.copilot-message .content em {
-  font-style: italic;
+.copilot-sources ul {
+  list-style-type: none;
+  padding: 0;
+  margin: 0;
 }
-
-.copilot-message .content code {
-  background: #f1f3f4;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Courier New', monospace;
-  font-size: 0.9em;
-  color: #d14;
-}
-
-.copilot-message .content a {
+.copilot-sources li a {
   color: #3a86ff;
   text-decoration: none;
+  font-size: 13px;
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  word-break: break-all;
 }
-
-.copilot-message .content a:hover {
+.copilot-sources li a:hover {
+  background-color: #e9efff;
   text-decoration: underline;
 }
 
-.streaming-cursor {
-  color: #3a86ff;
-  animation: blink 1s steps(1) infinite;
+/* 过渡效果 */
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  transform-origin: top;
 }
-@keyframes blink {
-  0%, 50% { opacity: 1; }
-  51%, 100% { opacity: 0; }
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+  transform: scaleY(0.9);
 }
 
-.copilot-input-area {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  border-top: 1px solid #eee;
-  background: #fff;
-  flex-shrink: 0; /* 防止输入区被压缩 */
-}
-.copilot-input {
-  flex: 1;
-  height: 36px;
-  border: 1px solid #ddd;
-  border-radius: 18px;
-  padding: 0 16px;
-  font-size: 15px;
-  outline: none;
-  margin-right: 10px;
-  background: #f7f7fb;
-  transition: border 0.2s;
-}
-.copilot-input:focus {
-  border: 1.5px solid #3a86ff;
-}
-.send-btn {
-  background: #3a86ff;
-  color: #fff;
-  border: none;
-  border-radius: 18px;
-  padding: 0 18px;
-  height: 36px;
-  font-size: 15px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.send-btn:disabled {
-  background: #b3c7f7;
-  cursor: not-allowed;
-}
+/* 其他样式保持不变 */
+.welcome-message { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: #555; }
+.welcome-logo { width: 60px; height: 60px; line-height: 60px; border-radius: 50%; background: #22223b; color: #fff; font-size: 28px; font-weight: bold; margin-bottom: 20px; }
+.copilot-btn { position: fixed; right: 32px; bottom: 32px; z-index: 2000; background: #22223b; border: none; border-radius: 50%; width: 56px; height: 56px; box-shadow: 0 4px 16px rgba(34,34,59,0.18); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.copilot-sidebar { position: fixed; top: 0; right: 0; width: 380px; height: 100vh; background: #fff; box-shadow: -2px 0 16px rgba(34,34,59,0.12); z-index: 2100; display: flex; flex-direction: column; }
+.slide-enter-active, .slide-leave-active { transition: transform 0.3s ease; }
+.slide-enter-from, .slide-leave-to { transform: translateX(100%); }
+.copilot-header { height: 56px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; border-bottom: 1px solid #eee; font-weight: bold; font-size: 18px; background: #f7f7fb; flex-shrink: 0; }
+.close-btn { background: none; border: none; font-size: 28px; color: #888; cursor: pointer; }
+.streaming-cursor { color: #3a86ff; animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.copilot-input-area { display: flex; align-items: center; padding: 12px 16px; border-top: 1px solid #eee; background: #fff; flex-shrink: 0; }
+.copilot-input { flex: 1; height: 40px; border: 1px solid #ddd; border-radius: 20px; padding: 0 16px; font-size: 15px; outline: none; margin-right: 10px; background: #f7f7fb; transition: border-color 0.2s; }
+.copilot-input:focus { border-color: #3a86ff; }
+.send-btn { background: #3a86ff; color: #fff; border: none; border-radius: 20px; padding: 0 20px; height: 40px; font-size: 15px; cursor: pointer; font-weight: bold; transition: background-color 0.2s; }
+.send-btn:disabled { background-color: #b3c7f7; cursor: not-allowed; }
 </style>
