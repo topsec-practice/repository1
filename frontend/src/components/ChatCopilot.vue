@@ -29,11 +29,11 @@
             :class="['copilot-message', msg.role]"
           >
             <span class="role">{{ msg.role === 'user' ? '我' : '小信' }}：</span>
-            <span class="content">{{ msg.content }}</span>
+            <span class="content" v-html="renderMarkdown(msg.content)"></span>
           </div>
           <div v-if="streaming" class="copilot-message assistant">
             <span class="role">小信：</span>
-            <span class="content">{{ streamContent }}</span>
+            <span class="content" v-html="renderMarkdown(streamContent)"></span>
             <span class="streaming-cursor">▋</span>
           </div>
         </div>
@@ -164,6 +164,37 @@ export default {
         this.scrollToBottom();
       }
     },
+    renderMarkdown(text) {
+      if (!text) return '';
+      
+      // 转义HTML特殊字符（防止XSS）
+      let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      
+      // 处理Markdown语法
+      // 加粗 **text** 或 __text__
+      html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      html = html.replace(/__(.*?)__/g, '<strong>$1</strong>');
+      
+      // 斜体 *text* 或 _text_
+      html = html.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      html = html.replace(/_(.*?)_/g, '<em>$1</em>');
+      
+      // 行内代码 `code`
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      
+      // 处理换行
+      html = html.replace(/\n/g, '<br>');
+      
+      // 处理链接 [text](url)
+      html = html.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+      
+      return html;
+    },
   },
 };
 </script>
@@ -290,6 +321,35 @@ export default {
 .copilot-message .content {
   margin-left: 4px;
 }
+
+/* Markdown样式 */
+.copilot-message .content strong {
+  font-weight: bold;
+  color: #22223b;
+}
+
+.copilot-message .content em {
+  font-style: italic;
+}
+
+.copilot-message .content code {
+  background: #f1f3f4;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #d14;
+}
+
+.copilot-message .content a {
+  color: #3a86ff;
+  text-decoration: none;
+}
+
+.copilot-message .content a:hover {
+  text-decoration: underline;
+}
+
 .streaming-cursor {
   color: #3a86ff;
   animation: blink 1s steps(1) infinite;
