@@ -3,14 +3,15 @@
     <el-table
       v-loading="listLoading"
       :data="list"
-      element-loading-text="Loading"
+      element-loading-text="加载中..."
       border
       fit
       highlight-current-row
+      :row-class-name="tableRowClassName"
     >
-      <el-table-column align="center" label="Number" width="95">
+      <el-table-column align="center" label="序号" width="95">
         <template slot-scope="scope">
-          {{ scope.$index }}
+          {{ scope.$index + 1 }}
         </template>
       </el-table-column>
 
@@ -20,7 +21,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="user_id" width="110" align="center">
+      <el-table-column label="用户ID" width="110" align="center">
         <template slot-scope="scope">
           <span>{{ scope.row.author }}</span>
         </template>
@@ -32,7 +33,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column class-name="status-col" label="md5" width="110" align="center">
+      <el-table-column class-name="status-col" label="MD5" width="110" align="center">
         <template slot-scope="scope">
           {{ scope.row.md5 }}
         </template>
@@ -50,7 +51,6 @@
           <span>{{ scope.row.display_time }}</span>
         </template>
       </el-table-column>
-
     </el-table>
   </div>
 </template>
@@ -85,7 +85,45 @@ export default {
         this.list = response.data.items
         this.listLoading = false
       })
+    },
+    // 行样式分类方法
+    tableRowClassName({ rowIndex }) {
+      return rowIndex % 2 === 0 ? '偶数行' : '奇数行'
     }
   }
 }
 </script>
+
+<style scoped>
+.app-container {
+  padding: 20px;
+}
+
+/* 偶数行样式 */
+.el-table >>> .偶数行 {
+  background-color: #ffffff;
+}
+
+/* 奇数行样式 */
+.el-table >>> .奇数行 {
+  background-color: #f5f7fa; /* 青灰色 */
+}
+
+/* 表头样式 */
+.el-table >>> th {
+  background-color: #f5f7fa !important;
+  color: #333;
+  font-weight: bold;
+}
+
+/* 单元格样式 */
+.el-table >>> td, .el-table >>> th {
+  padding: 12px 0;
+  border-color: #ebeef5;
+}
+
+/* 鼠标悬停效果 */
+.el-table >>> .el-table__body tr:hover > td {
+  background-color: #e6f7ff !important;
+}
+</style>
