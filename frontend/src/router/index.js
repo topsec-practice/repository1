@@ -78,6 +78,12 @@ export const constantRoutes = [
   },
 
   {
+    path: '/policy/list',
+    name: 'PolicyList',
+    component: () => import('@/views/form/index.vue') // 您的策略列表组件路径
+  },
+
+  {
     path: '/form',
     component: Layout,
     children: [

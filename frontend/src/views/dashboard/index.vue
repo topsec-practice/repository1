@@ -29,12 +29,14 @@
       <el-table-column prop="LastScanTime" label="最后扫描时间" align="center" />
       <el-table-column prop="IP" label="ip" align="center" />
       <el-table-column prop="status" label="状态" align="center" >
+        <template #default="{ row }">
           <el-tag 
             :type="row.status === 'online' ? 'success' : 'info'"
             effect="dark"
           >
             {{ row.status === 'online' ? '在线' : '离线' }}
           </el-tag>
+        </template>
       </el-table-column>
     </el-table>
   </div>
