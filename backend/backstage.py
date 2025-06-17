@@ -144,40 +144,53 @@ def statusinfo(db = Depends(get_db)):
         }
     }
 
-class strategy_Item(BaseModel):
+# 修改策略提交接口，支持同时创建策略和规则
+class StrategyWithRulesItem(BaseModel):
     strategy: str
+    rule_types: List[int]  # 新增字段，接收规则类型列表
 
 @app.post("/frontend/strategy/submit")
-def strategy_submit(req: strategy_Item, db = Depends(get_db)):
+def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
     # 生成唯一的policy_id
-    # 获取当前最大策略ID
     max_id_query = text("SELECT MAX(CAST(policy_id AS UNSIGNED)) FROM policy")
     max_id_result = db.execute(max_id_query).fetchone()
     current_max = max_id_result[0] if max_id_result[0] is not None else -1
-    #生成新id
     policy_id = str(current_max + 1)
     
-    # 检查policy_id是否已存在（虽然UUID冲突概率极低，但为了安全还是检查）
-    # check_query = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
-    # while db.execute(check_query, {"policy_id": policy_id}).fetchone():
-    #     policy_id = str(uuid.uuid4())  # 如果冲突，重新生成
-    
-    # 插入策略到数据库
-    insert_query = text("""
-        INSERT INTO policy (policy_id, policy_description)
-        VALUES (:policy_id, :policy_description)
-    """)
-    
     try:
-        db.execute(insert_query, {
+        # 插入策略到数据库
+        insert_policy = text("""
+            INSERT INTO policy (policy_id, policy_description)
+            VALUES (:policy_id, :policy_description)
+        """)
+        db.execute(insert_policy, {
             "policy_id": policy_id,
             "policy_description": req.strategy
         })
+        
+        # 为每个选中的规则类型创建规则
+        for rule_type in req.rule_types:
+            if rule_type not in RULE_MAPPING:
+                continue  # 跳过无效的规则类型
+                
+            rule_description = RULE_MAPPING[rule_type]["description"]
+            rule_id = str(rule_type)
+            
+            insert_rule = text("""
+                INSERT INTO rules (rule_id, policy_id, rule_description)
+                VALUES (:rule_id, :policy_id, :rule_description)
+            """)
+            db.execute(insert_rule, {
+                "rule_id": rule_id,
+                "policy_id": policy_id,
+                "rule_description": rule_description
+            })
+        
         db.commit()
         return {
             "code": 20000,
             "data": {
-                "message": "策略提交成功",
+                "message": "策略和规则提交成功",
                 "policy_id": policy_id
             }
         }
@@ -185,7 +198,7 @@ def strategy_submit(req: strategy_Item, db = Depends(get_db)):
         db.rollback()
         return {
             "code": 50000,
-            "message": f"策略提交失败: {str(e)}"
+            "message": f"提交失败: {str(e)}"
         }
 
 @app.post("/frontend/strategy/statu")

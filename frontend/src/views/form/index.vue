@@ -12,9 +12,21 @@
             v-model="form.strategy"
             type="textarea"
             :rows="3"
-            placeholder="请输入您的策略"
+            placeholder="添加对策略的描述"
             clearable
           ></el-input>
+        </el-form-item>
+        
+        <el-form-item label="选择规则" prop="selectedRules">
+          <el-checkbox-group v-model="form.selectedRules">
+            <el-checkbox 
+              v-for="item in ruleOptions" 
+              :key="item.value" 
+              :label="item.value"
+            >
+              {{ item.label }}
+            </el-checkbox>
+          </el-checkbox-group>
         </el-form-item>
         
         <el-form-item>
@@ -89,6 +101,7 @@
 <script>
 import { submitStrategy } from '@/api/Strategy'
 import { getPolicyList } from '@/api/policy'
+import { createRule } from '@/api/rules'
 
 export default {
   name: 'StrategyPage',
@@ -96,15 +109,42 @@ export default {
     return {
       // 策略提交模块数据
       form: {
-        strategy: ''
+        strategy: '',
+        selectedRules: []
       },
       rules: {
         strategy: [
           { required: true, message: '请输入策略内容', trigger: 'blur' },
           { max: 200, message: '策略内容不能超过200个字符', trigger: 'blur' }
+        ],
+        selectedRules: [
+          { type: 'array', required: true, message: '请至少选择一个规则', trigger: 'change' }
         ]
       },
       submitting: false,
+      
+      // 规则选项
+      ruleOptions: [
+        { value: 1, label: 'phone - 手机号码' },
+        { value: 2, label: 'ip - IPv4地址' },
+        { value: 3, label: 'mac - MAC地址' },
+        { value: 4, label: 'ipv6 - IPv6地址' },
+        { value: 5, label: 'bank_card - 银行卡号' },
+        { value: 6, label: 'email - 电子邮件地址' },
+        { value: 7, label: 'passport - 护照号码' },
+        { value: 8, label: 'id_number - 身份证号码' },
+        { value: 9, label: 'gender - 性别信息' },
+        { value: 10, label: 'national - 民族信息' },
+        { value: 11, label: 'carnum - 车牌号码' },
+        { value: 12, label: 'telephone - 固定电话号码' },
+        { value: 13, label: 'officer - 军官证号码' },
+        { value: 14, label: 'HM_pass - 港澳通行证号码' },
+        { value: 15, label: 'jdbc - JDBC连接字符串' },
+        { value: 16, label: 'organization - 组织机构代码' },
+        { value: 17, label: 'business - 工商注册号' },
+        { value: 18, label: 'credit - 统一社会信用代码' },
+        { value: 19, label: 'address_name - 中文地址和姓名' }
+      ],
       
       // 策略列表模块数据
       policyList: [],
@@ -134,28 +174,40 @@ export default {
   methods: {
     // 策略提交模块方法
     submitForm() {
-  this.$refs.form.validate(valid => {
-    if (valid) {
-      this.submitting = true
-      
-      submitStrategy(this.form.strategy)
-        .then(response => {
-          this.$message.success('策略提交成功！策略ID: ' + response.data.policy_id)
-          this.resetForm()
-          this.fetchPolicies() // 刷新策略列表
-        })
-        .catch(error => {
-          console.error('提交失败:', error)
-          this.$message.error('策略提交失败，请重试')
-        })
-        .finally(() => {
-          this.submitting = false
-        })
-    } else {
-      return false
-    }
-  })
-},
+      this.$refs.form.validate(valid => {
+        if (valid) {
+          this.submitting = true
+          
+          // 先提交策略
+          submitStrategy(this.form.strategy)
+            .then(response => {
+              const policyId = response.data.policy_id
+              this.$message.success('策略提交成功！策略ID: ' + policyId)
+              
+              // 然后为每条选中的规则创建规则记录
+              const rulePromises = this.form.selectedRules.map(ruleType => {
+                return createRule({
+                  policy_id: policyId,
+                  rule_type: ruleType
+                })
+              })
+              
+              return Promise.all(rulePromises)
+            })
+            .then(() => {
+              this.resetForm()
+              this.fetchPolicies() // 刷新策略列表
+            })
+            .catch(error => {
+              console.error('提交失败:', error)
+              this.$message.error('提交失败，请重试')
+            })
+            .finally(() => {
+              this.submitting = false
+            })
+        }
+      })
+    },
     resetForm() {
       this.$refs.form.resetFields()
     },
