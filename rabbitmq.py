@@ -7,10 +7,10 @@ from datetime import datetime
 
 # 连接数据库
 db = pymysql.connect(
-    host='localhost', #服务器名字
-    user='root', #用户
-    password='yjydmm520',  # 替换为你的真实密码
-    database='test', #数据库名字
+    host='47.108.169.120', #服务器名字
+    user='remote', #用户
+    password='123456',  # 替换为你的真实密码
+    database='trx', #数据库名字
     charset='utf8mb4'
 )
 cursor = db.cursor()
@@ -19,7 +19,7 @@ cursor = db.cursor()
 #用户的名字和密码
 user_info = pika.PlainCredentials('root', 'root')
 #本地部署，调用AMQR专用端口5672，同时如果要进入管理页面就访问localhost的15672端口即可
-connection = pika.BlockingConnection(pika.ConnectionParameters('10.175.28.39', 5672, '/', user_info))
+connection = pika.BlockingConnection(pika.ConnectionParameters('47.108.169.120', 5672, '/', user_info))
 #信道建立
 channel = connection.channel()
 #建立名字叫durable_queue的队列

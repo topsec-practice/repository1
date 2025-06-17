@@ -31,7 +31,7 @@ app.add_middleware(
 
 
 # 数据库配置
-DATABASE_URL = "mysql+pymysql://root:yjydmm520@localhost/test"
+DATABASE_URL = "mysql+pymysql://remote:123456@47.108.169.120/trx"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

@@ -31,8 +31,8 @@ active_connections: Dict[str, WebSocket] = {}
 # 连接数据库
 
 db = pymysql.connect(
-    host="localhost", 
-    user="root", 
+    host="47.108.169.120", 
+    user="remote", 
     password="123456",
     database="trx"
 )

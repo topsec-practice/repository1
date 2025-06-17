@@ -7,12 +7,11 @@ import time
 
 # 配置
 API_KEY = "secure-api-key-123"
-USER_ID = "user001"
-USER_ID = "test-client-01"
+USER_ID = "1"
 
-REST_URL_BASE = "http://127.0.0.1:5000/api"
-PUSH_URL = f"http://127.0.0.1:6100/push_policy/{USER_ID}"
-WS_URL = f"ws://127.0.0.1:6100/ws/{USER_ID}"
+REST_URL_BASE = "http://47.108.169.120:5000/api"
+PUSH_URL = f"http://47.108.169.120:6100/push_policy/{USER_ID}"
+WS_URL = f"ws://47.108.169.120:6100/ws/{USER_ID}"
 HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 
 
