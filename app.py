@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("UnifiedServer")
 
 # 安全配置
-ALLOWED_IPS = {'127.0.0.1', '192.168.1.100'}       # ip白名单
+# ALLOWED_IPS = {'127.0.0.1', '192.168.1.100'}       # ip白名单
 API_KEY = "secure-api-key-123"
 RATE_LIMIT_SECONDS = 5                             # 频率最大： 距上次时间
 
@@ -31,8 +31,8 @@ active_connections: Dict[str, WebSocket] = {}
 # 连接数据库
 
 db = pymysql.connect(
-    host="localhost", 
-    user="root", 
+    host="47.108.169.120", 
+    user="remote", 
     password="123456",
     database="trx"
 )
@@ -47,9 +47,11 @@ def check_auth(request: Request):
     return auth == f"Bearer {API_KEY}"
 
 # 检查ip是否正常
-def check_ip(request: Request):
-    ip = request.client.host
-    return ip in ALLOWED_IPS
+def check_ip(request):
+    sql = "SELECT IP FROM user WHERE ip = %s"
+    cursor.execute(sql, (request.client.host,))
+    result = cursor.fetchone()
+    return result is not None
 
 # 频率检测
 def rate_limit_check(ip):
@@ -145,10 +147,11 @@ def create_rest_app(clients):
 
         sql.update_user_status(db,cursor,user_id,"online",realnow.strftime("%Y-%m-%d %H:%M:%S"))
         logger.info(f"[HEARTBEAT] Client {user_id} ({ip}) heartbeat received.")
+        now_policy = sql.get_max_policyid(cursor)[0][0]  # 获取最新策略ID
         return {
             "status": "success",
             "message": "Heartbeat received, client online",
-            "now_policy": "default_policy",
+            "now_policy": now_policy,
             "user_id": user_id,
             "last_heartbeat": clients[ip]["last_heartbeat"]
         }
@@ -172,7 +175,7 @@ def create_ws_app(clients):
     async def websocket_endpoint(websocket: WebSocket, user_id: str):
         await websocket.accept()
         ip = websocket.client.host
-        if ip not in ALLOWED_IPS:
+        if check_ip(websocket) is False:
             await websocket.close()
             return
         

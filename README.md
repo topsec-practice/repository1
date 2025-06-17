@@ -1,23 +1,5 @@
 # repository1
 
-## 前端进度
-
-已完成前后端通信————已完成
-
-页面展示————已完成
-
-连接数据库————已完成
-
-消息队列问题修复成功（多了个消息stream，为以后多个管理员读一个消息做准备，还可以合并其他远程服务器日志）
-
-## 后端进度
-
-1. 客户端上线
-2. 心跳机制检测客户端连接和策略版本并更新策略
-3. 安全措施
-   - ip白名单
-   - api key
-
 ## 食用指南
 
 在frontend文件夹下：
@@ -34,7 +16,10 @@ npm install
 npm run dev
 ```
 
-然后运行后端文件：\backend\server.py
+然后运行后端文件：
+\backend\backstage.py (页面后台)
+\app.py (客户端连接)
+\rabbitmq.py (接收文件上报)
 
 访问[http://localhost:9528](http://localhost:9528)
 

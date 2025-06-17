@@ -143,7 +143,7 @@ def get_all_policies(cursor):
 
 def get_all_rules(cursor, policy_id):
     try:
-        sql = "SELECT * FROM rules WHERE policy_id = %s"
+        sql = "SELECT rule_id FROM rules WHERE policy_id = %s"
         cursor.execute(sql, (policy_id,))
         results = cursor.fetchall()
         return results
