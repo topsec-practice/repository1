@@ -79,6 +79,8 @@ async def listen_ws():
             while True:
                 message = await websocket.recv()
                 print(f"[WS] 收到策略: {message}")
+                with open("latest_policy.json", "w") as f:
+                    f.write(message)
 
     except Exception as e:
         print(f"[WS] 连接失败或中断: {e}")
