@@ -45,7 +45,7 @@
       </div>
       
       <el-table
-        :data="policyList"
+        :data="sortedPolicyList"
         style="width: 100%"
         v-loading="loading"
       >
@@ -115,6 +115,19 @@ export default {
       total: 0
     }
   },
+
+  computed: {
+    // 新增计算属性，用于反向排序策略列表
+    sortedPolicyList() {
+      return [...this.policyList].sort((a, b) => {
+        // 将policy_id转为数字比较
+        const idA = parseInt(a.policy_id)
+        const idB = parseInt(b.policy_id)
+        return idB - idA  // 降序排列
+      })
+    }
+  },
+
   created() {
     this.fetchPolicies()
   },

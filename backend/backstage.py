@@ -150,12 +150,17 @@ class strategy_Item(BaseModel):
 @app.post("/frontend/strategy/submit")
 def strategy_submit(req: strategy_Item, db = Depends(get_db)):
     # 生成唯一的policy_id
-    policy_id = str(uuid.uuid4())
+    # 获取当前最大策略ID
+    max_id_query = text("SELECT MAX(CAST(policy_id AS UNSIGNED)) FROM policy")
+    max_id_result = db.execute(max_id_query).fetchone()
+    current_max = max_id_result[0] if max_id_result[0] is not None else -1
+    #生成新id
+    policy_id = str(current_max + 1)
     
     # 检查policy_id是否已存在（虽然UUID冲突概率极低，但为了安全还是检查）
-    check_query = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
-    while db.execute(check_query, {"policy_id": policy_id}).fetchone():
-        policy_id = str(uuid.uuid4())  # 如果冲突，重新生成
+    # check_query = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
+    # while db.execute(check_query, {"policy_id": policy_id}).fetchone():
+    #     policy_id = str(uuid.uuid4())  # 如果冲突，重新生成
     
     # 插入策略到数据库
     insert_query = text("""
@@ -282,13 +287,14 @@ def rules_list(
     policy_id: str,  # 必选参数
     db = Depends(get_db)
 ):
-    # 查询特定policy_id的所有规则
+    # 查询特定policy_id的所有规则，并按rule_id升序排列
     query = text("""
         SELECT 
             rule_id,
             rule_description
         FROM rules
         WHERE policy_id = :policy_id
+        ORDER BY CAST(rule_id AS UNSIGNED) ASC  -- 将rule_id转换为数字排序
     """)
     
     result = db.execute(query, {"policy_id": policy_id})
@@ -306,6 +312,169 @@ def rules_list(
             "items": rules
         }
     }
+
+
+# # 添加规则
+# class RuleCreateItem(BaseModel):
+#     policy_id: str
+#     rule_description: str
+
+class RuleCreateItem(BaseModel):
+    policy_id: str
+    rule_type: int  # 改为接收规则类型ID
+
+RULE_MAPPING = {
+    1: {"description": "phone", "name": "手机号码"},
+    2: {"description": "ip", "name": "IPv4地址"},
+    3: {"description": "mac", "name": "MAC地址"},
+    4: {"description": "ipv6", "name": "IPv6地址"},
+    5: {"description": "bank_card", "name": "银行卡号"},
+    6: {"description": "email", "name": "电子邮件地址"},
+    7: {"description": "passport", "name": "护照号码"},
+    8: {"description": "id_number", "name": "身份证号码"},
+    9: {"description": "gender", "name": "性别信息"},
+    10: {"description": "national", "name": "民族信息"},
+    11: {"description": "carnum", "name": "车牌号码"},
+    12: {"description": "telephone", "name": "固定电话号码"},
+    13: {"description": "officer", "name": "军官证号码"},
+    14: {"description": "HM_pass", "name": "港澳通行证号码"},
+    15: {"description": "jdbc", "name": "JDBC连接字符串"},
+    16: {"description": "organization", "name": "组织机构代码"},
+    17: {"description": "business", "name": "工商注册号"},
+    18: {"description": "credit", "name": "统一社会信用代码"},
+    19: {"description": "address_name", "name": "中文地址和姓名"},
+}
+
+@app.post("/frontend/rules/create")
+def create_rule(req: RuleCreateItem, db = Depends(get_db)):
+    # 验证规则类型是否有效
+    if req.rule_type not in RULE_MAPPING:
+        return {"code": 40000, "message": "无效的规则类型"}
+    
+    # 使用规则类型作为rule_id
+    rule_id = str(req.rule_type)
+    rule_description = RULE_MAPPING[req.rule_type]["description"]
+    
+    try:
+        # 检查策略是否存在
+        policy_check = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
+        if not db.execute(policy_check, {"policy_id": req.policy_id}).fetchone():
+            return {"code": 40400, "message": "策略不存在"}
+        
+        # 检查是否已存在相同规则
+        rule_check = text("""
+            SELECT 1 FROM rules 
+            WHERE policy_id = :policy_id AND rule_description = :rule_description
+        """)
+        if db.execute(rule_check, {
+            "policy_id": req.policy_id,
+            "rule_description": rule_description
+        }).fetchone():
+            return {"code": 40000, "message": "该规则已存在"}
+        
+        # 插入新规则
+        insert_query = text("""
+            INSERT INTO rules (rule_id, policy_id, rule_description)
+            VALUES (:rule_id, :policy_id, :rule_description)
+        """)
+        db.execute(insert_query, {
+            "rule_id": rule_id,
+            "policy_id": req.policy_id,
+            "rule_description": rule_description
+        })
+        db.commit()
+        
+        return {
+            "code": 20000,
+            "data": {
+                "rule_id": rule_id,
+                "message": "规则创建成功"
+            }
+        }
+    except Exception as e:
+        db.rollback()
+        return {"code": 50000, "message": f"规则创建失败: {str(e)}"}
+
+# 更新规则
+class RuleUpdateItem(BaseModel):
+    rule_id: str
+    rule_description: str
+
+@app.post("/frontend/rules/update")
+def update_rule(req: RuleUpdateItem, db = Depends(get_db)):
+    try:
+        update_query = text("""
+            UPDATE rules 
+            SET rule_description = :rule_description
+            WHERE rule_id = :rule_id
+        """)
+        result = db.execute(update_query, {
+            "rule_id": req.rule_id,
+            "rule_description": req.rule_description
+        })
+        
+        if result.rowcount == 0:
+            return {"code": 40400, "message": "规则不存在"}
+        
+        db.commit()
+        return {"code": 20000, "data": "规则更新成功"}
+    except Exception as e:
+        db.rollback()
+        return {"code": 50000, "message": f"规则更新失败: {str(e)}"}
+
+# 删除规则
+@app.delete("/frontend/rules/delete")
+def delete_rule(rule_id: str, db = Depends(get_db)):
+    try:
+        # 开启事务
+        with db.begin():
+            # 1. 先删除关联的匹配记录
+            delete_matches = text("DELETE FROM matches WHERE rule_id = :rule_id")
+            db.execute(delete_matches, {"rule_id": rule_id})
+            
+            # 2. 再删除规则本身
+            delete_rule = text("DELETE FROM rules WHERE rule_id = :rule_id")
+            result = db.execute(delete_rule, {"rule_id": rule_id})
+            
+            if result.rowcount == 0:
+                return {"code": 40400, "message": "规则不存在"}
+            
+            return {"code": 20000, "data": "规则删除成功"}
+    except Exception as e:
+        return {"code": 50000, "message": f"规则删除失败: {str(e)}"}
+
+# 批量删除规则
+class BatchDeleteRulesItem(BaseModel):
+    rule_ids: List[str]
+
+@app.post("/frontend/rules/batch-delete")
+def batch_delete_rules(req: BatchDeleteRulesItem, db = Depends(get_db)):
+    try:
+        with db.begin():
+            # 1. 先删除关联的匹配记录
+            delete_matches = text("""
+                DELETE FROM matches 
+                WHERE rule_id IN :rule_ids
+            """)
+            db.execute(delete_matches, {"rule_ids": tuple(req.rule_ids)})
+            
+            # 2. 再删除规则本身
+            delete_rules = text("""
+                DELETE FROM rules 
+                WHERE rule_id IN :rule_ids
+            """)
+            result = db.execute(delete_rules, {"rule_ids": tuple(req.rule_ids)})
+            
+            return {
+                "code": 20000,
+                "data": {
+                    "deleted_count": result.rowcount
+                }
+            }
+    except Exception as e:
+        return {"code": 50000, "message": f"批量删除失败: {str(e)}"}
+    
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=6099)
