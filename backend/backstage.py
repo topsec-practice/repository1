@@ -155,6 +155,7 @@ def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
     current_max = max_id_result[0] if max_id_result[0] is not None else -1
     policy_id = str(current_max + 1)
     try:
+        # 1. 插入策略
         insert_policy = text("""
             INSERT INTO policy (policy_id, policy_description)
             VALUES (:policy_id, :policy_description)
@@ -163,19 +164,31 @@ def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
             "policy_id": policy_id,
             "policy_description": req.strategy
         })
+
+        # 2. 插入规则（如不存在）
         for rule_type in req.rule_types:
             if rule_type not in RULE_MAPPING:
                 continue
             rule_description = RULE_MAPPING[rule_type]["description"]
-            rule_id = str(rule_type)
-            insert_rule = text("""
-                INSERT INTO rules (rule_id, rule_description)
-                VALUES (:rule_id, :rule_description)
-            """)
-            db.execute(insert_rule, {
-                "rule_id": rule_id,
-                "rule_description": rule_description
-            })
+            rule_id = rule_type
+
+            # 检查规则是否已存在
+            rule_exist = db.execute(
+                text("SELECT 1 FROM rules WHERE rule_id = :rule_id"),
+                {"rule_id": rule_id}
+            ).fetchone()
+            if not rule_exist:
+                db.execute(
+                    text("INSERT INTO rules (rule_id, rule_description) VALUES (:rule_id, :rule_description)"),
+                    {"rule_id": rule_id, "rule_description": rule_description}
+                )
+
+            # 3. 插入策略-规则关联
+            db.execute(
+                text("INSERT INTO policy_rules (policy_id, rule_id) VALUES (:policy_id, :rule_id)"),
+                {"policy_id": policy_id, "rule_id": rule_id}
+            )
+
         db.commit()
         return {
             "code": 20000,
@@ -292,16 +305,15 @@ def rules_list(
     policy_id: str,  # 必选参数
     db = Depends(get_db)
 ):
-    # 查询特定policy_id的所有规则，并按rule_id升序排列
-
-    #改！
+    # 通过 policy_rules 关联查询该策略下所有规则
     query = text("""
         SELECT 
-            rule_id,
-            rule_description
-        FROM rules
-        WHERE policy_id = :policy_id
-        ORDER BY CAST(rule_id AS UNSIGNED) ASC  -- 将rule_id转换为数字排序
+            r.rule_id,
+            r.rule_description
+        FROM policy_rules pr
+        JOIN rules r ON pr.rule_id = r.rule_id
+        WHERE pr.policy_id = :policy_id
+        ORDER BY CAST(r.rule_id AS UNSIGNED) ASC
     """)
     
     result = db.execute(query, {"policy_id": policy_id})
