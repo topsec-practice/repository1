@@ -4,8 +4,8 @@ import json
 import datetime
 
 # RabbitMQ连接部分保持不变
-user_info = pika.PlainCredentials('admin', '123456')  
-connection = pika.BlockingConnection(pika.ConnectionParameters('47.108.169.120', 5672, '/', user_info)) 
+user_info = pika.PlainCredentials('root', 'root')  
+connection = pika.BlockingConnection(pika.ConnectionParameters('10.175.28.39', 5672, '/', user_info)) 
 channel = connection.channel()
 channel.queue_declare(queue='durable_queue', durable=True)
 
@@ -14,21 +14,21 @@ message = {
     "flag": 2,  # 使用flag=2进行批量插入
     "files": [
         {
-            "file_name": "file_nsfas",
-            "md5": "mdsafag",
+            "file_name": "filasdawdasds",
+            "md5": "masfqwasff",
             "count": 8,
             "rule_id": ["1", "3"],  # 规则列表
         },
         {
-            "file_name": "file_asd",
-            "md5": "mdasdasaga",
+            "file_name": "fasfawwadasfd",
+            "md5": "masfwqasdra",
             "count": 5,
             "rule_id": ["1"],  # 规则列表
         }
     ],
     "discovery_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    "user_id": "user_2",
-    "policy_id": "3"
+    "user_id": "1",
+    "policy_id": "1"
 }
 
 channel.basic_publish(
