@@ -373,18 +373,18 @@ def create_rule(req: RuleCreateItem, db = Depends(get_db)):
         policy_check = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
         if not db.execute(policy_check, {"policy_id": req.policy_id}).fetchone():
             return {"code": 40400, "message": "策略不存在"}
-        
+    
         # 检查是否已存在相同规则
-        rule_check = text("""
-            SELECT 1 FROM rules 
-            WHERE policy_id = :policy_id AND rule_description = :rule_description
-        """)
-        if db.execute(rule_check, {
-            "policy_id": req.policy_id,
-            "rule_description": rule_description
-        }).fetchone():
-            return {"code": 40000, "message": "该规则已存在"}
-        
+ #       rule_check = text("""
+ #           SELECT 1 FROM rules 
+ #           WHERE policy_id = :policy_id AND rule_description = :rule_description
+ #       """)
+ #       if db.execute(rule_check, {
+ #           "policy_id": req.policy_id,
+ #           "rule_description": rule_description
+ #       }).fetchone():
+ #           return {"code": 40000, "message": "该规则已存在123"}
+     
         # 插入新规则
         insert_query = text("""
             INSERT INTO rules (rule_id, policy_id, rule_description)
