@@ -143,7 +143,13 @@ def get_all_policies(cursor):
 
 def get_all_rules(cursor, policy_id):
     try:
-        sql = "SELECT rule_id FROM rules WHERE policy_id = %s"
+        sql = """
+        SELECT r.rule_id, r.rule_description
+        FROM policy_rules pr
+        JOIN rules r ON pr.rule_id = r.rule_id
+        WHERE pr.policy_id = %s
+        ORDER BY CAST(r.rule_id AS UNSIGNED) ASC
+        """
         cursor.execute(sql, (policy_id,))
         results = cursor.fetchall()
         return results
@@ -160,6 +166,16 @@ def get_all_users(cursor, admin_id):
     except Exception as e:
         print(f"Error: {e}")
         return []
+
+def update_user_policy(db, cursor, user_id, policy_id):
+    try:
+        sql = "UPDATE user SET policy_id = %s WHERE user_id = %s"
+        cursor.execute(sql, (policy_id, user_id))
+        db.commit()
+        print("update user policy success")
+    except Exception as e:
+        print(f"Error: {e}")
+        db.rollback()
 
 
 

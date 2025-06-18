@@ -202,17 +202,18 @@ def create_ws_app(clients):
         if user_id not in active_connections:
             return {"status": "error", "message": "Client not connected"}
         
-        policy_id=sql.get_max_policyid(cursor)[0][0]
-        rules=sql.get_all_rules(cursor,policy_id)
-        rules = [rule[0] for rule in rules]
+        policy_id = sql.get_max_policyid(cursor)[0][0]
+        rules = sql.get_all_rules(cursor, policy_id)
+        rules_id = [rule[0] for rule in rules]
 
         policy_data = {
             "type": "policy_update",
             "policy_id": policy_id,
-            "rules": rules
+            "rules": rules_id  # 只返回 rule_id 列表
         }
         try:
             await active_connections[user_id].send_text(json.dumps(policy_data))
+            sql.update_user_policy(db, cursor, user_id, policy_id)
             return {"status": "success", "message": "Policy pushed"}
         except Exception as e:
             return {"status": "error", "message": str(e)}
