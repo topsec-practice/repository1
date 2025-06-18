@@ -8,9 +8,10 @@ def upload(db, cursor, user_id, files):
             # 插入文件信息到数据库
             md5 = file["md5"]
             file_name = file["name"]
-            discovery_time = file["discovery_time"] 
+            discovery_time = file["discovery_time"]
             file_id = file["file_id"]
             count = file["count"]
+            # trx.sql: files(file_id, user_id, md5, file_name, discovery_time, count)
             sql = "INSERT INTO files (file_id, user_id, md5, file_name, discovery_time, count) VALUES (%s, %s, %s, %s, %s, %s)"
             value = (file_id, user_id, md5, file_name, discovery_time, count)
             cursor.execute(sql, value)
@@ -20,6 +21,7 @@ def upload(db, cursor, user_id, files):
             rule_id = file["rule_id"]
             # rule_id 是个列表
             for rule in rule_id:
+                # trx.sql: matches(file_id, policy_id, rule_id, user_id)
                 sql = "INSERT INTO matches (file_id, policy_id, rule_id, user_id) VALUES (%s, %s, %s, %s)"
                 value = (file_id, policy_id, rule, user_id)
                 cursor.execute(sql, value)
@@ -32,15 +34,14 @@ def upload(db, cursor, user_id, files):
 
 def update_user_status(db, cursor, user_id, status, LastEchoTime):
     try:
-        sql="UPDATE user SET status = %s, LastEchoTime = %s WHERE user_id = %s"
-        # print(sql%(status,LastEchoTime,user_id))
-        cursor.execute(sql,(status, LastEchoTime, user_id))
+        # trx.sql: user(user_id, status, LastEchoTime, ...)
+        sql = "UPDATE user SET status = %s, LastEchoTime = %s WHERE user_id = %s"
+        cursor.execute(sql, (status, LastEchoTime, user_id))
         db.commit()
         print("update user status success")
     except Exception as e:
         print(f"Error: {e}")
         db.rollback()
-
 
 def delete_file(db, cursor, file_id, user_id, policy_id):
     try:
@@ -60,19 +61,19 @@ def update_file(db, cursor, file_id, user_id, new_md5, new_file_name, count, dis
     try:
         # 更新文件信息
         sql = "UPDATE files SET md5 = %s, file_name = %s, discovery_time = %s, count = %s WHERE file_id = %s AND user_id = %s"
-        cursor.execute(sql, (new_md5, new_file_name, count, discovery_time, file_id, user_id))
-        
-        # 更新匹配记录
-        sql = "UPDATE matches SET rule_id = %s, policy_id = %s WHERE file_id = %s AND user_id = %s"
-        cursor.execute(sql, (rule_id, policy_id, file_id, user_id))
-
+        cursor.execute(sql, (new_md5, new_file_name, discovery_time, count, file_id, user_id))
+        # 先删除旧的matches
+        sql = "DELETE FROM matches WHERE file_id = %s AND user_id = %s"
+        cursor.execute(sql, (file_id, user_id))
+        # 重新插入matches
+        for rule in rule_id:
+            sql = "INSERT INTO matches (file_id, policy_id, rule_id, user_id) VALUES (%s, %s, %s, %s)"
+            cursor.execute(sql, (file_id, policy_id, rule, user_id))
         db.commit()
         print("File updated successfully.")
-
     except Exception as e:
         print(f"Error: {e}")
         db.rollback()
-
 
 def get_file_policy_rule_info(db, cursor, user_id):
     try:
@@ -96,7 +97,6 @@ def get_file_policy_rule_info(db, cursor, user_id):
         cursor.execute(sql, (user_id,))
         results = cursor.fetchall()
         return results
-    #results是二维列表
     except Exception as e:
         print(f"Error: {e}")
         return []
@@ -123,7 +123,7 @@ def insert_rule(db, cursor, rule_id, policy_id, rule_description):
 
 def get_max_policyid(cursor):
     try:
-        sql = "SELECT max(policy_id) FROM policy"
+        sql = "SELECT max(CAST(policy_id AS UNSIGNED)) FROM policy"
         cursor.execute(sql)
         results = cursor.fetchall()
         return results

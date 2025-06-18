@@ -17,7 +17,7 @@ cursor = db.cursor()
 
 # RabbitMQ
 #用户的名字和密码
-user_info = pika.PlainCredentials('root', 'root')
+user_info = pika.PlainCredentials('admin', '123456')
 #本地部署，调用AMQR专用端口5672，同时如果要进入管理页面就访问localhost的15672端口即可
 connection = pika.BlockingConnection(pika.ConnectionParameters('47.108.169.120', 5672, '/', user_info))
 #信道建立
@@ -70,7 +70,6 @@ def callback(ch, method, properties, body):
 
 def insert_file_and_matches(data):
     """插入文件记录和关联的匹配记录"""
-    # 插入文件记录
     sql = """
         INSERT INTO files (file_id, user_id, file_name, md5, discovery_time, count)
         VALUES (%s, %s, %s, %s, %s, %s)
@@ -88,33 +87,33 @@ def insert_file_and_matches(data):
         data["discovery_time"],
         data["count"]
     ))
-    
     # 插入匹配记录（如果有提供 policy_id 和 rule_id）
     if "policy_id" in data and "rule_id" in data:
-        insert_match_record(data)
-    
+        # rule_id 可能为列表
+        if isinstance(data["rule_id"], list):
+            for rule in data["rule_id"]:
+                insert_match_record({
+                    "policy_id": data["policy_id"],
+                    "file_id": data["file_id"],
+                    "user_id": data["user_id"],
+                    "rule_id": rule
+                })
+        else:
+            insert_match_record(data)
     print(f" [√] 插入/更新文件记录: {data['file_id']}")
 
 def update_file_and_matches(data):
     """更新文件记录和关联的匹配记录"""
-    # 先删除旧的匹配记录
-    cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s", 
+    cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s",
                   (data["user_id"], data["file_id"]))
-    
-    # 更新文件记录
     insert_file_and_matches(data)
 
 def insert_or_update_file_and_matches(data):
-    """插入或更新文件记录和匹配记录"""
-    # 检查文件是否存在
-    cursor.execute("SELECT 1 FROM files WHERE user_id = %s AND file_id = %s", 
+    cursor.execute("SELECT 1 FROM files WHERE user_id = %s AND file_id = %s",
                   (data["user_id"], data["file_id"]))
-    
     if cursor.fetchone():
-        # 文件存在，执行更新
         update_file_and_matches(data)
     else:
-        # 文件不存在，执行插入
         insert_file_and_matches(data)
 
 def insert_match_record(data):

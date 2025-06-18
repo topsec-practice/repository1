@@ -116,7 +116,6 @@ def table_list(db = Depends(get_db)):
 # 修改后的statusinfo函数
 @app.get("/frontend/statusinfo")
 def statusinfo(db = Depends(get_db)):
-    # 查询数据库获取用户状态
     query = text("""
         SELECT user_id as id, user_name as name, status, 
                LastEchoTime, LastScanTime, IP, user_key
@@ -151,14 +150,11 @@ class StrategyWithRulesItem(BaseModel):
 
 @app.post("/frontend/strategy/submit")
 def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
-    # 生成唯一的policy_id
     max_id_query = text("SELECT MAX(CAST(policy_id AS UNSIGNED)) FROM policy")
     max_id_result = db.execute(max_id_query).fetchone()
     current_max = max_id_result[0] if max_id_result[0] is not None else -1
     policy_id = str(current_max + 1)
-    
     try:
-        # 插入策略到数据库
         insert_policy = text("""
             INSERT INTO policy (policy_id, policy_description)
             VALUES (:policy_id, :policy_description)
@@ -167,15 +163,11 @@ def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
             "policy_id": policy_id,
             "policy_description": req.strategy
         })
-        
-        # 为每个选中的规则类型创建规则
         for rule_type in req.rule_types:
             if rule_type not in RULE_MAPPING:
-                continue  # 跳过无效的规则类型
-                
+                continue
             rule_description = RULE_MAPPING[rule_type]["description"]
             rule_id = str(rule_type)
-            
             insert_rule = text("""
                 INSERT INTO rules (rule_id, policy_id, rule_description)
                 VALUES (:rule_id, :policy_id, :rule_description)
@@ -185,7 +177,6 @@ def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
                 "policy_id": policy_id,
                 "rule_description": rule_description
             })
-        
         db.commit()
         return {
             "code": 20000,
@@ -270,13 +261,15 @@ def policy_list(
     # 添加搜索条件
     params = {}
     if search:
-        query = text(f"""
-            {query}
+        query = text("""
+            SELECT 
+                policy_id,
+                policy_description
+            FROM policy
             WHERE policy_id LIKE :search 
             OR policy_description LIKE :search
         """)
         params["search"] = f"%{search}%"
-    
     result = db.execute(query, params)
     policies = []
     for row in result:
@@ -360,21 +353,14 @@ RULE_MAPPING = {
 
 @app.post("/frontend/rules/create")
 def create_rule(req: RuleCreateItem, db = Depends(get_db)):
-    # 验证规则类型是否有效
     if req.rule_type not in RULE_MAPPING:
         return {"code": 40000, "message": "无效的规则类型"}
-    
-    # 使用规则类型作为rule_id
     rule_id = str(req.rule_type)
     rule_description = RULE_MAPPING[req.rule_type]["description"]
-    
     try:
-        # 检查策略是否存在
         policy_check = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
         if not db.execute(policy_check, {"policy_id": req.policy_id}).fetchone():
             return {"code": 40400, "message": "策略不存在"}
-        
-        # 检查是否已存在相同规则
         rule_check = text("""
             SELECT 1 FROM rules 
             WHERE policy_id = :policy_id AND rule_description = :rule_description
@@ -384,8 +370,6 @@ def create_rule(req: RuleCreateItem, db = Depends(get_db)):
             "rule_description": rule_description
         }).fetchone():
             return {"code": 40000, "message": "该规则已存在"}
-        
-        # 插入新规则
         insert_query = text("""
             INSERT INTO rules (rule_id, policy_id, rule_description)
             VALUES (:rule_id, :policy_id, :rule_description)
@@ -396,7 +380,6 @@ def create_rule(req: RuleCreateItem, db = Depends(get_db)):
             "rule_description": rule_description
         })
         db.commit()
-        
         return {
             "code": 20000,
             "data": {

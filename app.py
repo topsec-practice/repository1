@@ -195,6 +195,7 @@ def create_ws_app(clients):
         except WebSocketDisconnect:
             logger.info(f"[WS] Client {user_id} disconnected")
             active_connections.pop(user_id, None)
+            sql.update_user_status(db,cursor,user_id,"offline",datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     @ws_app.post("/push_policy/{user_id}")
     async def push_policy(user_id: str):
@@ -203,6 +204,7 @@ def create_ws_app(clients):
         
         policy_id=sql.get_max_policyid(cursor)[0][0]
         rules=sql.get_all_rules(cursor,policy_id)
+        rules = [rule[0] for rule in rules]
 
         policy_data = {
             "type": "policy_update",
