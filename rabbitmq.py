@@ -31,7 +31,6 @@ def callback(ch, method, properties, body):
         data = json.loads(body.decode('utf-8'))
         flag = int(data.get("flag", -1))
         user_id = data.get("user_id")
-        md5 = data.get("md5")
         
         if not user_id:
             raise ValueError("user_id is required")
@@ -61,10 +60,12 @@ def callback(ch, method, properties, body):
 
         elif flag == 3:
             # 删除指定的 user_id + md5 及其匹配记录
-    
-            cursor.execute("DELETE FROM matches WHERE user_id = %s AND md5 = %s", (user_id, md5))
-            cursor.execute("DELETE FROM files WHERE user_id = %s AND md5 = %s", (user_id, md5))
-            print(f" [i] 已删除 md5 = {md5}, user_id = {user_id} 及其匹配记录")
+            file_id = data.get("file_id")
+            if not file_id:
+                raise ValueError("file_id is required for flag=3")
+            cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s", (user_id, file_id))
+            cursor.execute("DELETE FROM files WHERE user_id = %s AND file_id = %s", (user_id, file_id))
+            print(f" [i] 已删除 file_id = {file_id}, user_id = {user_id} 及其匹配记录")
 
         else:
             print(" [!] 未知操作 flag")
