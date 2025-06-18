@@ -179,16 +179,26 @@ export default {
           this.submitting = true
           
           // 先提交策略
-          submitStrategy(this.form.strategy)
+          submitStrategy({
+                          strategy: this.form.strategy,
+                          selectedRules: this.form.selectedRules
+                        })
             .then(response => {
               const policyId = response.data.policy_id
-              this.$message.success('策略提交成功！策略ID: ' + policyId)
+              this.$message.success('策略提交成功123！策略ID: ' + policyId)
               
               // 然后为每条选中的规则创建规则记录
               const rulePromises = this.form.selectedRules.map(ruleType => {
                 return createRule({
                   policy_id: policyId,
                   rule_type: ruleType
+                })
+                .then(response => {
+                  console.log('规则创建成功:', response)
+                })
+                .catch(error => {
+                  console.error('规则创建失败:', error)
+                  this.$message.error('部分规则提交失败，请重试')
                 })
               })
               

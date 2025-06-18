@@ -169,12 +169,11 @@ def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
             rule_description = RULE_MAPPING[rule_type]["description"]
             rule_id = str(rule_type)
             insert_rule = text("""
-                INSERT INTO rules (rule_id, policy_id, rule_description)
-                VALUES (:rule_id, :policy_id, :rule_description)
+                INSERT INTO rules (rule_id, rule_description)
+                VALUES (:rule_id, :rule_description)
             """)
             db.execute(insert_rule, {
                 "rule_id": rule_id,
-                "policy_id": policy_id,
                 "rule_description": rule_description
             })
         db.commit()
@@ -294,6 +293,8 @@ def rules_list(
     db = Depends(get_db)
 ):
     # 查询特定policy_id的所有规则，并按rule_id升序排列
+
+    #改！
     query = text("""
         SELECT 
             rule_id,
@@ -391,84 +392,84 @@ def create_rule(req: RuleCreateItem, db = Depends(get_db)):
         db.rollback()
         return {"code": 50000, "message": f"规则创建失败: {str(e)}"}
 
-# 更新规则
-class RuleUpdateItem(BaseModel):
-    rule_id: str
-    rule_description: str
+# # 更新规则
+# class RuleUpdateItem(BaseModel):
+#     rule_id: str
+#     rule_description: str
 
-@app.post("/frontend/rules/update")
-def update_rule(req: RuleUpdateItem, db = Depends(get_db)):
-    try:
-        update_query = text("""
-            UPDATE rules 
-            SET rule_description = :rule_description
-            WHERE rule_id = :rule_id
-        """)
-        result = db.execute(update_query, {
-            "rule_id": req.rule_id,
-            "rule_description": req.rule_description
-        })
+# @app.post("/frontend/rules/update")
+# def update_rule(req: RuleUpdateItem, db = Depends(get_db)):
+#     try:
+#         update_query = text("""
+#             UPDATE rules 
+#             SET rule_description = :rule_description
+#             WHERE rule_id = :rule_id
+#         """)
+#         result = db.execute(update_query, {
+#             "rule_id": req.rule_id,
+#             "rule_description": req.rule_description
+#         })
         
-        if result.rowcount == 0:
-            return {"code": 40400, "message": "规则不存在"}
+#         if result.rowcount == 0:
+#             return {"code": 40400, "message": "规则不存在"}
         
-        db.commit()
-        return {"code": 20000, "data": "规则更新成功"}
-    except Exception as e:
-        db.rollback()
-        return {"code": 50000, "message": f"规则更新失败: {str(e)}"}
+#         db.commit()
+#         return {"code": 20000, "data": "规则更新成功"}
+#     except Exception as e:
+#         db.rollback()
+#         return {"code": 50000, "message": f"规则更新失败: {str(e)}"}
 
-# 删除规则
-@app.delete("/frontend/rules/delete")
-def delete_rule(rule_id: str, db = Depends(get_db)):
-    try:
-        # 开启事务
-        with db.begin():
-            # 1. 先删除关联的匹配记录
-            delete_matches = text("DELETE FROM matches WHERE rule_id = :rule_id")
-            db.execute(delete_matches, {"rule_id": rule_id})
+# # 删除规则
+# @app.delete("/frontend/rules/delete")
+# def delete_rule(rule_id: str, db = Depends(get_db)):
+#     try:
+#         # 开启事务
+#         with db.begin():
+#             # 1. 先删除关联的匹配记录
+#             delete_matches = text("DELETE FROM matches WHERE rule_id = :rule_id")
+#             db.execute(delete_matches, {"rule_id": rule_id})
             
-            # 2. 再删除规则本身
-            delete_rule = text("DELETE FROM rules WHERE rule_id = :rule_id")
-            result = db.execute(delete_rule, {"rule_id": rule_id})
+#             # 2. 再删除规则本身
+#             delete_rule = text("DELETE FROM rules WHERE rule_id = :rule_id")
+#             result = db.execute(delete_rule, {"rule_id": rule_id})
             
-            if result.rowcount == 0:
-                return {"code": 40400, "message": "规则不存在"}
+#             if result.rowcount == 0:
+#                 return {"code": 40400, "message": "规则不存在"}
             
-            return {"code": 20000, "data": "规则删除成功"}
-    except Exception as e:
-        return {"code": 50000, "message": f"规则删除失败: {str(e)}"}
+#             return {"code": 20000, "data": "规则删除成功"}
+#     except Exception as e:
+#         return {"code": 50000, "message": f"规则删除失败: {str(e)}"}
 
-# 批量删除规则
-class BatchDeleteRulesItem(BaseModel):
-    rule_ids: List[str]
+# # 批量删除规则
+# class BatchDeleteRulesItem(BaseModel):
+#     rule_ids: List[str]
 
-@app.post("/frontend/rules/batch-delete")
-def batch_delete_rules(req: BatchDeleteRulesItem, db = Depends(get_db)):
-    try:
-        with db.begin():
-            # 1. 先删除关联的匹配记录
-            delete_matches = text("""
-                DELETE FROM matches 
-                WHERE rule_id IN :rule_ids
-            """)
-            db.execute(delete_matches, {"rule_ids": tuple(req.rule_ids)})
+# @app.post("/frontend/rules/batch-delete")
+# def batch_delete_rules(req: BatchDeleteRulesItem, db = Depends(get_db)):
+#     try:
+#         with db.begin():
+#             # 1. 先删除关联的匹配记录
+#             delete_matches = text("""
+#                 DELETE FROM matches 
+#                 WHERE rule_id IN :rule_ids
+#             """)
+#             db.execute(delete_matches, {"rule_ids": tuple(req.rule_ids)})
             
-            # 2. 再删除规则本身
-            delete_rules = text("""
-                DELETE FROM rules 
-                WHERE rule_id IN :rule_ids
-            """)
-            result = db.execute(delete_rules, {"rule_ids": tuple(req.rule_ids)})
+#             # 2. 再删除规则本身
+#             delete_rules = text("""
+#                 DELETE FROM rules 
+#                 WHERE rule_id IN :rule_ids
+#             """)
+#             result = db.execute(delete_rules, {"rule_ids": tuple(req.rule_ids)})
             
-            return {
-                "code": 20000,
-                "data": {
-                    "deleted_count": result.rowcount
-                }
-            }
-    except Exception as e:
-        return {"code": 50000, "message": f"批量删除失败: {str(e)}"}
+#             return {
+#                 "code": 20000,
+#                 "data": {
+#                     "deleted_count": result.rowcount
+#                 }
+#             }
+#     except Exception as e:
+#         return {"code": 50000, "message": f"批量删除失败: {str(e)}"}
     
 
 

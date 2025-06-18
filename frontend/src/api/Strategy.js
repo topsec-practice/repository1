@@ -1,12 +1,13 @@
 import request from '@/utils/request'
 
 // 策略提交API
-export function submitStrategy(strategy) {
+export function submitStrategy(data) {
   return request({
-    url: '/frontend/strategy/submit', // 替换为实际API地址
+    url: '/frontend/strategy/submit',
     method: 'post',
     data: {
-      strategy: strategy
+      strategy: data.strategy,
+      rule_types: data.selectedRules
     }
   })
 }

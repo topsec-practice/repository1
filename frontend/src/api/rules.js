@@ -22,22 +22,22 @@ export function createRule(data) {
 }
 
 
-//单个删除
-export function deleteRule(ruleId) {
-  return request({
-    url: '/frontend/rules/delete',
-    method: 'delete',
-    params: { rule_id: ruleId }
-  })
-}
+// //单个删除
+// export function deleteRule(ruleId) {
+//   return request({
+//     url: '/frontend/rules/delete',
+//     method: 'delete',
+//     params: { rule_id: ruleId }
+//   })
+// }
 
-// 批量删除规则
-export function batchDeleteRules(data) {
-  return request({
-    url: '/frontend/rules/batch-delete',
-    method: 'post',
-    data: {
-      rule_ids: data.rule_ids
-    }
-  })
-}
+// // 批量删除规则
+// export function batchDeleteRules(data) {
+//   return request({
+//     url: '/frontend/rules/batch-delete',
+//     method: 'post',
+//     data: {
+//       rule_ids: data.rule_ids
+//     }
+//   })
+// }
