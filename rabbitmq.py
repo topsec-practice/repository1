@@ -2,7 +2,6 @@
 import pika
 import pymysql
 import json
-import time
 from datetime import datetime
 
 # 连接数据库
@@ -25,14 +24,19 @@ channel = connection.channel()
 #建立名字叫durable_queue的队列
 channel.queue_declare(queue='durable_queue', durable=True)
 
-# 数据库连接保持不变...
+def validate_file_data(file_data):
+    """验证文件数据是否包含必要字段"""
+    required_fields = ['file_name', 'md5', 'count']
+    for field in required_fields:
+        if field not in file_data:
+            raise ValueError(f"缺少必要字段: {field}")
+    return True
 
 def callback(ch, method, properties, body):
     try:
         data = json.loads(body.decode('utf-8'))
         flag = int(data.get("flag", -1))
         user_id = data.get("user_id")
-        file_id = data.get("file_id")
         
         if not user_id:
             raise ValueError("user_id is required")
@@ -48,28 +52,53 @@ def callback(ch, method, properties, body):
             update_file_and_matches(data)
 
         elif flag == 2:
-            # 插入或更新一条文件记录及其匹配记录
-            insert_or_update_file_and_matches(data)
+            # 处理批量插入或更新
+            if "files" in data:
+                for file_data in data["files"]:
+                    try:
+                        validate_file_data(file_data)
+                        file_data.update({
+                            "user_id": user_id,
+                            "discovery_time": data.get("discovery_time", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                        })
+                        insert_or_update_file_and_matches(file_data)
+                    except Exception as e:
+                        print(f" [×] 处理文件数据失败: {e}")
+                        continue
+            else:
+                try:
+                    validate_file_data(data)
+                    data["discovery_time"] = data.get("discovery_time", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    insert_or_update_file_and_matches(data)
+                except Exception as e:
+                    print(f" [×] 处理文件数据失败: {e}")
+                    raise
 
         elif flag == 3:
-            # 删除指定的 user_id + file_id 及其匹配记录
+            # 删除指定的 user_id + md5 及其匹配记录
+            file_id = data.get("file_id")
+            if not file_id:
+                raise ValueError("file_id is required for flag=3")
             cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s", (user_id, file_id))
             cursor.execute("DELETE FROM files WHERE user_id = %s AND file_id = %s", (user_id, file_id))
             print(f" [i] 已删除 file_id = {file_id}, user_id = {user_id} 及其匹配记录")
 
         else:
-            print(" [!] 未知操作 flag")
+            print(f" [!] 未知操作 flag: {flag}")
 
         db.commit()
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     except Exception as e:
-        print(f" [×] 错误: {e}")
+        print(f" [×] 错误处理消息: {e}")
         db.rollback()
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
 def insert_file_and_matches(data):
     """插入文件记录和关联的匹配记录"""
+    
+    data["file_id"] = data["md5"]
+    
     sql = """
         INSERT INTO files (file_id, user_id, file_name, md5, discovery_time, count)
         VALUES (%s, %s, %s, %s, %s, %s)
@@ -87,28 +116,28 @@ def insert_file_and_matches(data):
         data["discovery_time"],
         data["count"]
     ))
-    # 插入匹配记录（如果有提供 policy_id 和 rule_id）
-    if "policy_id" in data and "rule_id" in data:
-        # rule_id 可能为列表
-        if isinstance(data["rule_id"], list):
-            for rule in data["rule_id"]:
-                insert_match_record({
-                    "policy_id": data["policy_id"],
-                    "file_id": data["file_id"],
-                    "user_id": data["user_id"],
-                    "rule_id": rule
-                })
-        else:
-            insert_match_record(data)
-    print(f" [√] 插入/更新文件记录: {data['file_id']}")
+    
+    # 插入匹配记录
+    if "rule_id" in data:
+        rule_ids = data["rule_id"] if isinstance(data["rule_id"], list) else [data["rule_id"]]
+        for rule_id in rule_ids:
+            insert_match_record({
+                "file_id": data["file_id"],
+                "user_id": data["user_id"],
+                "rule_id": rule_id
+            })
 
 def update_file_and_matches(data):
     """更新文件记录和关联的匹配记录"""
+    
+    data["file_id"] = data["md5"]
     cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s",
                   (data["user_id"], data["file_id"]))
     insert_file_and_matches(data)
 
 def insert_or_update_file_and_matches(data):
+    
+    data["file_id"] = data["md5"]
     cursor.execute("SELECT 1 FROM files WHERE user_id = %s AND file_id = %s",
                   (data["user_id"], data["file_id"]))
     if cursor.fetchone():
@@ -119,26 +148,22 @@ def insert_or_update_file_and_matches(data):
 def insert_match_record(data):
     """插入单个匹配记录"""
     sql = """
-        INSERT INTO matches (policy_id, file_id, user_id, rule_id)
-        VALUES (%s, %s, %s, %s)
+        INSERT INTO matches (file_id, user_id, rule_id, match_time)
+        VALUES (%s, %s, %s, NOW())
         ON DUPLICATE KEY UPDATE
             rule_id = VALUES(rule_id)
     """
     cursor.execute(sql, (
-        data["policy_id"],
         data["file_id"],
         data["user_id"],
         data["rule_id"]
     ))
-    print(f" [√] 插入/更新匹配记录: policy_id={data['policy_id']}, rule_id={data['rule_id']}")
 
-# 消费逻辑保持不变...
-
-#消费的逻辑
+# 消费逻辑
 channel.basic_consume(
-    queue='durable_queue',#队列名字
-    auto_ack=False,#是否自动ack
-    on_message_callback=callback#调用callback类的方法
+    queue='durable_queue',
+    auto_ack=False,
+    on_message_callback=callback
 )
 
 print("等待消息中...（按 Ctrl+C 退出）")

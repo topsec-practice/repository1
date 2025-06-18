@@ -3,12 +3,9 @@ import pika
 import json
 import datetime
 
-#这里是rabbitMQ的链接部分
-#用户的名字和密码
-user_info = pika.PlainCredentials('admin', '123456')  
-#本地部署，调用AMQR专用端口5672，同时如果要进入管理页面就访问localhost的15672端口即可
-connection = pika.BlockingConnection(pika.ConnectionParameters('47.108.169.120', 5672, '/', user_info))
-#信道建立
+# RabbitMQ连接部分保持不变
+user_info = pika.PlainCredentials('root', 'root')  
+connection = pika.BlockingConnection(pika.ConnectionParameters('10.175.28.39', 5672, '/', user_info)) 
 channel = connection.channel()
 channel.queue_declare(queue='durable_queue', durable=True)
 
@@ -17,25 +14,21 @@ message = {
     "flag": 2,  # 使用flag=2进行批量插入
     "files": [
         {
-            "file_name": "file_name1",
-            "md5": "md51",
-            "count": 8
+            "file_name": "filasdawdasds",
+            "md5": "masfqwasff",
+            "count": 8,
+            "rule_id": ["1", "3"],  # 规则列表
         },
         {
-            "file_name": "file_name2",
-            "md5": "md52",
-            "count": 5
-        },
-        {
-            "file_name": "file_name3",
-            "md5": "md53",
-            "count": 10
+            "file_name": "fasfawwadasfd",
+            "md5": "masfwqasdra",
+            "count": 5,
+            "rule_id": ["1"],  # 规则列表
         }
     ],
     "discovery_time": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-    "user_id": "user_2",
-    "rule_id": ["1", "3"],  # 规则列表
-    "policy_id": "3"
+    "user_id": "1",
+    "policy_id": "1"
 }
 
 channel.basic_publish(
