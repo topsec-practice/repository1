@@ -72,7 +72,8 @@ export const constantRoutes = [
         path: 'tree',
         name: 'Tree',
         component: () => import('@/views/tree/index'),
-        meta: { title: '用户敏感文件', icon: 'tree' }
+        meta: { title: '用户敏感文件', icon: 'tree' },
+        props: route => ({ userId: route.query.userId })  // 支持query参数传
       }
     ]
   },
@@ -95,7 +96,6 @@ export const constantRoutes = [
       }
     ]
   },
-
   // {
   //   path: '/nested',
   //   component: Layout,
