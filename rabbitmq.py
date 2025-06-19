@@ -74,34 +74,45 @@ def callback(ch, method, properties, body):
             print(f" [i] 已删除 user_id = {user_id} 所有文件和匹配记录")
 
         elif flag == 1:
-            # 更新指定文件及其匹配记录
-            update_file_and_matches(data)
-            print(f" [i] 已更新文件和匹配记录: {data.get('file_name', '未知文件')} (user_id: {user_id})")
+        # 批量更新文件（与 flag=2 逻辑一致，但先清空旧记录）
+            if "files" in data:
+                for file_data in data["files"]:
+                    try:
+                        validate_file_data(file_data)
+                        # 注入公共字段：user_id 和顶级的 discovery_time
+                        file_data.update({
+                            "user_id": user_id,
+                            "discovery_time": data["discovery_time"]
+                        })
+                        update_file_and_matches(file_data)  # 调用更新逻辑
+                    except Exception as e:
+                        print(f" [×] 处理文件数据失败: {e}")
+            else:
+                raise ValueError("flag=1 需要传递 files 数组")
 
         elif flag == 2:
-            # 处理批量插入或更新
+        # 批量插入或更新
             if "files" in data:
                 for file_data in data["files"]:
                     try:
                         validate_file_data(file_data)
                         file_data.update({
                             "user_id": user_id,
-                            "discovery_time": data.get("discovery_time", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                            "discovery_time": data["discovery_time"]
                         })
                         insert_or_update_file_and_matches(file_data)
-                        print(f" [i] 已处理文件数据: {file_data.get('file_name', '未知文件')} (user_id: {user_id})")
                     except Exception as e:
                         print(f" [×] 处理文件数据失败: {e}")
-                        continue
             else:
                 try:
                     validate_file_data(data)
-                    data["discovery_time"] = data.get("discovery_time", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+                    data.update({
+                        "user_id": user_id,
+                        "discovery_time": data["discovery_time"]
+                    })
                     insert_or_update_file_and_matches(data)
-                    print(f" [i] 已处理文件数据: {data.get('file_name', '未知文件')} (user_id: {user_id})")
                 except Exception as e:
                     print(f" [×] 处理文件数据失败: {e}")
-                    raise
 
         elif flag == 3:
             # 删除指定的 user_id + md5 及其匹配记录
@@ -168,11 +179,16 @@ def insert_file_and_matches(data):
 
 def update_file_and_matches(data):
     """更新文件记录和关联的匹配记录"""
-    
+    if "md5" not in data:
+        raise ValueError("data 必须包含 md5 字段")
     data["file_id"] = data["md5"]
-    cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s",
-                  (data["user_id"], data["file_id"]))
-    insert_file_and_matches(data)
+    # 先删除旧匹配记录
+    cursor.execute(
+        "DELETE FROM matches WHERE user_id = %s AND file_id = %s",
+        (data["user_id"], data["file_id"])
+    )
+    # 插入更新后的文件记录
+    insert_file_and_matches(data)  # 复用插入逻辑
 
 def insert_or_update_file_and_matches(data):
     
