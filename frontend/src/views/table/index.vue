@@ -7,9 +7,9 @@
           :icon="sortOrder === 'descending' ? 'el-icon-sort-down' : 'el-icon-sort-up'"
           @click="toggleSortOrder"
         >
-          {{ sortOrder === 'descending' ? '降序 ▼' : '升序 ▲' }}
+          {{ sortOrder === 'descending' ? '最新在前 ▼' : '最早在前 ▲' }}
         </el-button>
-        <el-tooltip content="恢复默认排序" placement="top">
+        <el-tooltip content="恢复默认排序（最新在前）" placement="top">
           <el-button 
             icon="el-icon-refresh" 
             @click="resetSort"
@@ -28,17 +28,14 @@
       :row-class-name="tableRowClassName"
       @sort-change="handleSortChange"
     >
-      <!-- 序号列：直接显示 sortIndex -->
+      <!-- 序号列：显示排序后的序号 -->
       <el-table-column 
         align="center" 
         label="序号" 
         width="95"
-        prop="sortIndex"
-        sortable
-        :sort-orders="['descending', 'ascending']"
       >
         <template slot-scope="scope">
-          {{ scope.row.sortIndex }} <!-- 直接显示 sortIndex -->
+          {{ scope.$index + 1 }}
         </template>
       </el-table-column>
 
@@ -72,7 +69,14 @@
         </template>
       </el-table-column>
 
-      <el-table-column align="center" prop="created_at" label="发现时间" width="200">
+      <el-table-column 
+        align="center" 
+        prop="display_time" 
+        label="发现时间" 
+        width="200"
+        sortable
+        :sort-orders="['descending', 'ascending']"
+      >
         <template slot-scope="scope">
           <i class="el-icon-time" />
           <span>{{ scope.row.display_time }}</span>
@@ -90,26 +94,25 @@ export default {
     return {
       list: null,
       listLoading: true,
-      sortProp: 'sortIndex',   // 固定按 sortIndex 排序
-      sortOrder: 'descending'  // 默认降序
+      sortProp: 'display_time',   // 改为按发现时间排序
+      sortOrder: 'descending'     // 默认降序（最新时间在前）
     }
   },
   computed: {
     sortedList() {
       if (!this.list) return []
       
-      // 为数据分配 sortIndex（假设数据本身已有 sortIndex 字段）
-      // 如果数据没有 sortIndex，可以用 id 或其他唯一值替代
-      const listWithIndex = this.list.map(item => ({
-        ...item,
-        sortIndex: item.sortIndex || item.id // 优先用 sortIndex，没有则用 id
-      }))
+      // 复制数组以避免修改原始数据
+      const listCopy = [...this.list]
       
-      // 按 sortIndex 排序
-      return listWithIndex.sort((a, b) => {
+      // 按发现时间排序
+      return listCopy.sort((a, b) => {
+        const timeA = new Date(a.display_time).getTime()
+        const timeB = new Date(b.display_time).getTime()
+        
         return this.sortOrder === 'descending' 
-          ? b.sortIndex - a.sortIndex // 降序：9,8,7...
-          : a.sortIndex - b.sortIndex // 升序：1,2,3...
+          ? timeB - timeA // 降序：最新时间在前
+          : timeA - timeB // 升序：最早时间在前
       })
     }
   },
@@ -125,7 +128,7 @@ export default {
     // 处理排序事件（Element UI 触发）
     handleSortChange({ prop, order }) {
       this.sortProp = prop
-      this.sortOrder = order
+      this.sortOrder = order || 'descending'
     },
     // 行样式方法
     tableRowClassName({ rowIndex }) {

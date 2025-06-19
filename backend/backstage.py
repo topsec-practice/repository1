@@ -9,7 +9,7 @@ from typing import Dict, List
 from datetime import datetime, timedelta
 import uvicorn
 import pymysql
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, bindparam
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from fastapi import FastAPI, Depends
@@ -81,16 +81,19 @@ def admin_logout():
 
 @app.get("/frontend/table/list")
 def table_list(db = Depends(get_db)):
-    # 查询数据库获取文件列表（仅从files表）
+    # 查询文件及其命中的敏感规则
     query = text("""
         SELECT 
-            file_id as id,
-            file_name as title,
-            user_id,
-            count as pageviews,
-            discovery_time as display_time,
-            md5
-        FROM files
+            f.file_id as id,
+            f.file_name as title,
+            f.user_id,
+            f.count as pageviews,
+            f.discovery_time as display_time,
+            f.md5,
+            GROUP_CONCAT(m.rule_id) as rule_ids
+        FROM files f
+        LEFT JOIN matches m ON f.file_id = m.file_id AND f.user_id = m.user_id
+        GROUP BY f.file_id, f.user_id
     """)
     
     result = db.execute(query)
@@ -99,10 +102,11 @@ def table_list(db = Depends(get_db)):
         files.append({
             "id": row.id,
             "title": row.title,
-            "author": row.user_id,  # 使用实际的user_id作为author
+            "author": row.user_id,
             "pageviews": row.pageviews,
             "display_time": row.display_time.strftime("%Y-%m-%d %H:%M:%S") if row.display_time else None,
-            "md5": row.md5
+            "md5": row.md5,
+            "rule_ids": [int(rid) for rid in row.rule_ids.split(',')] if row.rule_ids else []
         })
     
     return {
@@ -211,43 +215,35 @@ def strategy_submit():
             }
 
 @app.get("/frontend/matches/list")
-# def matches_list(
-#     search: str = None,  # 添加搜索参数
-#     db = Depends(get_db)
-# ):
-def matches_list(db = Depends(get_db)):
-    # 基础查询
-    query = text("""
-        SELECT 
-            policy_id,
-            file_id,
-            rule_id,
-            user_id
+def matches_list(user_id: str, db = Depends(get_db)):
+    # 1. 查该用户当前策略
+    policy_query = text("SELECT policy_id FROM user WHERE user_id = :user_id")
+    policy_row = db.execute(policy_query, {"user_id": user_id}).fetchone()
+    if not policy_row:
+        return {"code": 40004, "message": "用户不存在"}
+    policy_id = policy_row.policy_id
+
+    # 2. 查该策略下所有规则
+    rule_query = text("SELECT rule_id FROM policy_rules WHERE policy_id = :policy_id")
+    rule_rows = db.execute(rule_query, {"policy_id": policy_id}).fetchall()
+    rule_ids = [row.rule_id for row in rule_rows]
+    if not rule_ids:
+        return {"code": 20000, "data": {"total": 0, "items": []}}
+
+    # 3. 查matches表中该用户、这些规则的所有匹配
+    matches_query = text("""
+        SELECT file_id, rule_id, user_id
         FROM matches
-    """)
-    
-    # 添加搜索条件
-    # params = {}
-    # if search:
-    #     query = text(f"""
-    #         {query}
-    #         AND (policy_id LIKE :search 
-    #         OR file_id LIKE :search 
-    #         OR rule_id LIKE :search 
-    #         OR user_id LIKE :search)
-    #     """)
-    #     params["search"] = f"%{search}%"
-    
-    result = db.execute(query)
+        WHERE user_id = :user_id AND rule_id IN :rule_ids
+    """).bindparams(bindparam('rule_ids', expanding=True))
+    result = db.execute(matches_query, {"user_id": user_id, "rule_ids": rule_ids})
     matches = []
     for row in result:
         matches.append({
-            "rule_id": row.rule_id,
-            "policy_id": row.policy_id,
             "file_id": row.file_id,
-            "user_id": row.user_id,
+            "rule_id": row.rule_id,
+            "user_id": row.user_id
         })
-    
     return {
         "code": 20000,
         "data": {

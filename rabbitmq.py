@@ -51,6 +51,7 @@ def callback(ch, method, properties, body):
         elif flag == 1:
             # 更新指定文件及其匹配记录
             update_file_and_matches(data)
+            print(f" [i] 已更新文件和匹配记录: {data.get('file_name', '未知文件')} (user_id: {user_id})")
 
         elif flag == 2:
             # 处理批量插入或更新
@@ -63,6 +64,7 @@ def callback(ch, method, properties, body):
                             "discovery_time": data.get("discovery_time", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                         })
                         insert_or_update_file_and_matches(file_data)
+                        print(f" [i] 已处理文件数据: {file_data.get('file_name', '未知文件')} (user_id: {user_id})")
                     except Exception as e:
                         print(f" [×] 处理文件数据失败: {e}")
                         continue
@@ -71,6 +73,7 @@ def callback(ch, method, properties, body):
                     validate_file_data(data)
                     data["discovery_time"] = data.get("discovery_time", datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
                     insert_or_update_file_and_matches(data)
+                    print(f" [i] 已处理文件数据: {data.get('file_name', '未知文件')} (user_id: {user_id})")
                 except Exception as e:
                     print(f" [×] 处理文件数据失败: {e}")
                     raise

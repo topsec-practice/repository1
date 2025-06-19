@@ -1,12 +1,19 @@
 <template>
   <div class="dashboard-container">
-    <!-- 顶部搜索框 -->
+    <!-- 顶部搜索框和用户ID输入 -->
     <div class="search-bar">
       <el-input
-        v-model="filterText"
-        placeholder="搜索规则ID、策略ID、文件ID或用户ID"
+        v-model="userId"
+        placeholder="请输入用户ID"
         clearable
-        style="width: 300px"
+        style="width: 200px; margin-right: 10px;"
+      />
+      <el-button type="primary" @click="fetchData">查询</el-button>
+      <el-input
+        v-model="filterText"
+        placeholder="搜索规则ID、文件ID或用户ID"
+        clearable
+        style="width: 300px; margin-left: 20px;"
         @input="handleSearch"
       >
         <template #append>
@@ -23,16 +30,8 @@
       fit
       highlight-current-row
     >
-      <el-table-column label="策略ID" prop="policy_id" width="180" align="center">
-        <template #default="{row}">
-          <el-tag>{{ row.policy_id }}</el-tag>
-        </template>
-      </el-table-column>
-
       <el-table-column label="规则ID" prop="rule_id" width="180" align="center" />
-
       <el-table-column label="文件ID" prop="file_id" width="180" align="center" />
-
       <el-table-column label="用户ID" prop="user_id" width="180" align="center" />
     </el-table>
 
@@ -54,11 +53,12 @@ export default {
   name: 'MatchesList',
   data() {
     return {
+      userId: '', // 新增
       filterText: '',
       listLoading: false,
-      matchesList: [], // 从数据库获取的原始数据
-      filteredList: [], // 过滤后的完整列表
-      filteredMatches: [], // 当前页显示的数据
+      matchesList: [],
+      filteredList: [],
+      filteredMatches: [],
       pageSize: 10
     }
   },
@@ -67,13 +67,14 @@ export default {
       return this.filteredList.length
     }
   },
-  created() {
-    this.fetchData()
-  },
   methods: {
     fetchData() {
+      if (!this.userId) {
+        this.$message.warning('请先输入用户ID')
+        return
+      }
       this.listLoading = true
-      getMatchesList().then(response => {
+      getMatchesList({ user_id: this.userId }).then(response => {
         this.matchesList = response.data.items
         this.filteredList = this.matchesList
         this.handlePageChange(1)
@@ -89,14 +90,13 @@ export default {
         const searchText = this.filterText.toLowerCase()
         this.filteredList = this.matchesList.filter(item => {
           return (
-            (item.policy_id && item.policy_id.toLowerCase().includes(searchText)) ||
-            (item.rule_id && item.rule_id.toLowerCase().includes(searchText)) ||
-            (item.file_id && item.file_id.toLowerCase().includes(searchText)) ||
-            (item.user_id && item.user_id.toLowerCase().includes(searchText))
+            (item.rule_id && String(item.rule_id).toLowerCase().includes(searchText)) ||
+            (item.file_id && String(item.file_id).toLowerCase().includes(searchText)) ||
+            (item.user_id && String(item.user_id).toLowerCase().includes(searchText))
           )
         })
       }
-      this.handlePageChange(1) // 搜索后重置到第一页
+      this.handlePageChange(1)
     },
     handlePageChange(page) {
       const start = (page - 1) * this.pageSize
