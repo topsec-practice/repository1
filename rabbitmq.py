@@ -80,12 +80,22 @@ def callback(ch, method, properties, body):
 
         elif flag == 3:
             # 删除指定的 user_id + md5 及其匹配记录
-            file_id = data.get("file_id")
-            if not file_id:
-                raise ValueError("file_id is required for flag=3")
-            cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s", (user_id, file_id))
-            cursor.execute("DELETE FROM files WHERE user_id = %s AND file_id = %s", (user_id, file_id))
-            print(f" [i] 已删除 file_id = {file_id}, user_id = {user_id} 及其匹配记录")
+            if "files" in data:
+                for file_data in data["files"]:
+                    file_id = file_data.get("md5")
+                    if not file_id:
+                        print(" [×] file_id (md5) is required for each file in flag=3")
+                        continue
+                    cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s", (user_id, file_id))
+                    cursor.execute("DELETE FROM files WHERE user_id = %s AND file_id = %s", (user_id, file_id))
+                    print(f" [i] 已删除 file_id = {file_id}, user_id = {user_id} 及其匹配记录")
+            else:
+                file_id = data.get("md5")
+                if not file_id:
+                    raise ValueError("file_id is required for flag=3")
+                cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s", (user_id, file_id))
+                cursor.execute("DELETE FROM files WHERE user_id = %s AND file_id = %s", (user_id, file_id))
+                print(f" [i] 已删除 file_id = {file_id}, user_id = {user_id} 及其匹配记录")
 
         else:
             print(f" [!] 未知操作 flag: {flag}")
