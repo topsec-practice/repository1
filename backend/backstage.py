@@ -12,7 +12,10 @@ import pymysql
 from sqlalchemy import create_engine, text, bindparam
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Query
+import sys
+sys.path.append("..")
+from log import get_upload_logs
 
 
 app = FastAPI()
@@ -479,6 +482,35 @@ def create_rule(req: RuleCreateItem, db = Depends(get_db)):
 #     except Exception as e:
 #         return {"code": 50000, "message": f"批量删除失败: {str(e)}"}
     
+
+@app.get("/frontend/uploadlog/list")
+def uploadlog_list(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1),
+):
+    # influxdb配置
+    url = "http://47.108.169.120:8086"
+    token = 'YkXOflEN22TCy2cZSndeY6KIOZeatb99QwecnptwJDZ_ehVqiYGXR8ihOW9oOKFQCBtgGfhY70ww0QhNe3I8uw=='
+    org = "trx"
+    bucket = "log"
+    logs = get_upload_logs(url, token, org, bucket)
+    # 按时间倒序
+    logs = sorted(logs, key=lambda x: x.get("time"), reverse=True)
+    total = len(logs)
+    start = (page - 1) * limit
+    end = start + limit
+    items = logs[start:end]
+    # 转换时间为字符串
+    for item in items:
+        if "time" in item and item["time"]:
+            item["time"] = item["time"].strftime("%Y-%m-%d %H:%M:%S")
+    return {
+        "code": 20000,
+        "data": {
+            "total": total,
+            "items": items
+        }
+    }
 
 
 if __name__ == "__main__":

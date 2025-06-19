@@ -4,8 +4,8 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import json
 
 org = "trx"
-url = "http://localhost:8086"
-token = 'PGrDLJWSk18Cq1C8h7pKKn8J5EbMR2slKjdE7UN9cmz6scmaj2IX3L1Eq-dlFQ26s6pC_JUoEAMGu-Gl8cVEgQ=='
+url = "http://47.108.169.120:8086"
+token = 'YkXOflEN22TCy2cZSndeY6KIOZeatb99QwecnptwJDZ_ehVqiYGXR8ihOW9oOKFQCBtgGfhY70ww0QhNe3I8uw=='
 
 def log_data(url, token, org, bucket, user_id, log_message):
     with InfluxDBClient(url=url, token=token, org=org) as client:
@@ -78,9 +78,7 @@ def get_upload_logs(url, token, org, bucket, start_time="0"):
 
 if __name__ == "__main__":
     org = "trx"
-    url = "http://localhost:8086"
-    token = 'PGrDLJWSk18Cq1C8h7pKKn8J5EbMR2slKjdE7UN9cmz6scmaj2IX3L1Eq-dlFQ26s6pC_JUoEAMGu-Gl8cVEgQ=='
-    bucket = "test"
-    user_id = "user_1"
-    log_message = "This is a log message."
+    url = "http://47.108.169.120:8086"
+    token = 'YkXOflEN22TCy2cZSndeY6KIOZeatb99QwecnptwJDZ_ehVqiYGXR8ihOW9oOKFQCBtgGfhY70ww0QhNe3I8uw=='
+    bucket = "log"
 
