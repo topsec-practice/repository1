@@ -50,10 +50,15 @@
 import { getMatchesList } from '@/api/matches'
 
 export default {
-  name: 'MatchesList',
+  name: 'SensitiveFiles',
+  props: {
+    userId: {
+      type: String,
+      default: ''
+    }
+  },
   data() {
     return {
-      userId: '', // 新增
       filterText: '',
       listLoading: false,
       matchesList: [],
@@ -67,14 +72,24 @@ export default {
       return this.filteredList.length
     }
   },
-  methods: {
-    fetchData() {
-      if (!this.userId) {
-        this.$message.warning('请先输入用户ID')
-        return
+  watch: {
+    userId(newVal) {
+      if (newVal) {
+        this.fetchData(newVal)
       }
+    }
+  },
+  created() {
+    // 优先使用props中的userId，其次使用路由参数
+    const targetUserId = this.userId || this.$route.query.userId
+    if (targetUserId) {
+      this.fetchData(targetUserId)
+    }
+  },
+  methods: {
+    fetchData(userId) {
       this.listLoading = true
-      getMatchesList({ user_id: this.userId }).then(response => {
+      getMatchesList({ user_id: userId }).then(response => {
         this.matchesList = response.data.items
         this.filteredList = this.matchesList
         this.handlePageChange(1)
@@ -93,9 +108,10 @@ export default {
             (item.rule_id && String(item.rule_id).toLowerCase().includes(searchText)) ||
             (item.file_id && String(item.file_id).toLowerCase().includes(searchText)) ||
             (item.user_id && String(item.user_id).toLowerCase().includes(searchText))
-          )
-        })
+          
+        )})
       }
+
       this.handlePageChange(1)
     },
     handlePageChange(page) {

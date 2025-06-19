@@ -11,7 +11,7 @@ channel.queue_declare(queue='durable_queue', durable=True)
 
 # 新格式的消息（不再需要指定file_id）
 message = {
-    "flag": 2,  # 使用flag=2进行批量插入
+    "flag": 2,  # 使用flag=2进行新文件批量插入,flag=0删除该userid下的所有文件,flag=1更新指定文件的信息,flag=3删除指定文件
     "files": [
         {
             "file_name": "asdgads",

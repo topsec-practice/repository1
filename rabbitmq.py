@@ -3,6 +3,9 @@ import pika
 import pymysql
 import json
 from datetime import datetime
+import influxdb_client, os, time
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
 
 # 连接数据库
 db = pymysql.connect(
@@ -13,6 +16,25 @@ db = pymysql.connect(
     charset='utf8mb4'
 )
 cursor = db.cursor()
+
+org = "trx"
+url = "http://47.108.169.120:8086"
+token = 'YkXOflEN22TCy2cZSndeY6KIOZeatb99QwecnptwJDZ_ehVqiYGXR8ihOW9oOKFQCBtgGfhY70ww0QhNe3I8uw=='
+bucket = "log"
+
+def log_data(url, token, org, bucket, user_id, log_message):
+    with InfluxDBClient(url=url, token=token, org=org) as client:
+        log_message = json.dumps(log_message, ensure_ascii=False)
+        write_api = client.write_api(write_options=SYNCHRONOUS)
+        point = (
+            Point("measurement1")
+            .tag("user_id", user_id)
+            .field("log", log_message)
+        )
+        write_api.write(bucket=bucket, org=org, record=point)
+        
+
+
 
 # RabbitMQ
 #用户的名字和密码
@@ -36,12 +58,15 @@ def callback(ch, method, properties, body):
     try:
         print(f" [debug] 原始消息: {body.decode('utf-8')}")
         data = json.loads(body.decode('utf-8'))
+
         flag = int(data.get("flag", -1))
         user_id = data.get("user_id")
         
         if not user_id:
             raise ValueError("user_id is required")
-
+        print("start log")
+        log_data(url, token, org, bucket, user_id, log_message=data)
+        print("end log")
         if flag == 0:
             # 删除该用户所有 files 和关联的 matches
             cursor.execute("DELETE FROM matches WHERE user_id = %s", (user_id,))

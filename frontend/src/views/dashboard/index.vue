@@ -21,14 +21,15 @@
       style="width: 100%" 
       border
       highlight-current-row
+      @row-click="handleRowClick"
     >
-      <el-table-column prop="id" label="用户ID"  align="center" />
-      <el-table-column prop="name" label="用户名"  align="center" />
+      <el-table-column prop="id" label="用户ID" align="center" />
+      <el-table-column prop="name" label="用户名" align="center" />
       <el-table-column prop="key" label="用户密码" align="center" />
       <el-table-column prop="LastEchoTime" label="最后登录时间" align="center" />
       <el-table-column prop="LastScanTime" label="最后扫描时间" align="center" />
       <el-table-column prop="IP" label="ip" align="center" />
-      <el-table-column prop="status" label="状态" align="center" >
+      <el-table-column prop="status" label="状态" align="center">
         <template #default="{ row }">
           <el-tag 
             :type="row.status === 'online' ? 'success' : 'info'"
@@ -46,7 +47,6 @@
 import { StatusInfo } from '@/api/statusinfo';
 
 export default {
-  
   name: 'UserStatus',
   data() {
     return {
@@ -70,15 +70,26 @@ export default {
   },
   methods: {
     handleSearch() {
-      // 这里可以添加实际的搜索逻辑
       console.log('当前搜索词:', this.searchQuery)
-    }
-    ,fetchData()
-    {
+    },
+    fetchData() {
       this.listLoading = true
       StatusInfo().then(response => {
         this.userList = response.data.items
-        // this.listLoading = false
+      })
+    },
+    // handleRowClick(row) {
+    //   // 跳转到敏感信息页面并传递用户ID
+    //   this.$router.push({
+    //     path: '/example/tree',
+    //     query: { userId: row.id }
+    //   })
+    // }
+    handleRowClick(row) {
+      // 使用命名路由跳转
+      this.$router.push({
+        name: 'Tree',  // 使用路由名称而不是路径
+        query: { userId: row.id }
       })
     }
   }
@@ -101,6 +112,14 @@ export default {
     
     ::v-deep .el-table__cell {
       padding: 12px 0;
+    }
+    
+    // 添加行点击效果
+    ::v-deep .el-table__row {
+      cursor: pointer;
+      &:hover {
+        background-color: #f5f7fa;
+      }
     }
   }
 
