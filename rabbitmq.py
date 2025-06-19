@@ -34,6 +34,7 @@ def validate_file_data(file_data):
 
 def callback(ch, method, properties, body):
     try:
+        print(f" [debug] 原始消息: {body.decode('utf-8')}")
         data = json.loads(body.decode('utf-8'))
         flag = int(data.get("flag", -1))
         user_id = data.get("user_id")
@@ -90,7 +91,7 @@ def callback(ch, method, properties, body):
         ch.basic_ack(delivery_tag=method.delivery_tag)
 
     except Exception as e:
-        print(f" [×] 错误处理消息: {e}")
+        print(f" [×] 错误类型: {type(e).__name__}, 错误详情: {str(e)}")
         db.rollback()
         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
 
