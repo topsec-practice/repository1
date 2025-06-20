@@ -32,7 +32,7 @@
     >
       <el-table-column label="规则ID" prop="rule_id" width="180" align="center" />
       <el-table-column label="文件ID" prop="file_id" width="180" align="center" />
-      <el-table-column label="用户ID" prop="user_id" width="180" align="center" />
+      <el-table-column label="用户名" prop="user_name" width="180" align="center" />
     </el-table>
 
     <el-pagination

@@ -234,18 +234,25 @@ def matches_list(user_id: str, db = Depends(get_db)):
         return {"code": 20000, "data": {"total": 0, "items": []}}
 
     # 3. 查matches表中该用户、这些规则的所有匹配
+    user_query = text("""
+        SELECT user_name
+        FROM user
+        WHERE user_id = :user_id
+    """).bindparams(bindparam('user_id', expanding=True))
+    userresult = db.execute(user_query, {"user_id": user_id}).fetchone()
+    user_name= userresult.user_name
     matches_query = text("""
-        SELECT file_id, rule_id, user_id
+        SELECT file_id, rule_id
         FROM matches
         WHERE user_id = :user_id AND rule_id IN :rule_ids
-    """).bindparams(bindparam('rule_ids', expanding=True))
+    """)
     result = db.execute(matches_query, {"user_id": user_id, "rule_ids": rule_ids})
     matches = []
     for row in result:
         matches.append({
             "file_id": row.file_id,
             "rule_id": row.rule_id,
-            "user_id": row.user_id
+            "user_name": user_name
         })
     return {
         "code": 20000,
