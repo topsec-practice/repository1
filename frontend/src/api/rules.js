@@ -10,16 +10,16 @@ export function getRulesByPolicyId(policyId) {
 }
 
 //新建
-export function createRule(data) {
-  return request({
-    url: '/frontend/rules/create',
-    method: 'post',
-    data: {
-      policy_id: data.policy_id,
-      rule_type: data.rule_type  // 修改为发送rule_type
-    }
-  })
-}
+// export function createRule(data) {
+//   return request({
+//     url: '/frontend/rules/create',
+//     method: 'post',
+//     data: {
+//       policy_id: data.policy_id,
+//       rule_type: data.rule_type  // 修改为发送rule_type
+//     }
+//   })
+// }
 
 
 // //单个删除

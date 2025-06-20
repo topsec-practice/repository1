@@ -363,45 +363,45 @@ RULE_MAPPING = {
     19: {"description": "address_name", "name": "中文地址和姓名"},
 }
 
-@app.post("/frontend/rules/create")
-def create_rule(req: RuleCreateItem, db = Depends(get_db)):
-    if req.rule_type not in RULE_MAPPING:
-        return {"code": 40000, "message": "无效的规则类型"}
-    rule_id = str(req.rule_type)
-    rule_description = RULE_MAPPING[req.rule_type]["description"]
-    try:
-        policy_check = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
-        if not db.execute(policy_check, {"policy_id": req.policy_id}).fetchone():
-            return {"code": 40400, "message": "策略不存在"}
-        rule_check = text("""
-            SELECT 1 FROM rules 
-            WHERE policy_id = :policy_id AND rule_description = :rule_description
-        """)
-        if db.execute(rule_check, {
-            "policy_id": req.policy_id,
-            "rule_description": rule_description
-        }).fetchone():
-            return {"code": 40000, "message": "该规则已存在"}
-        insert_query = text("""
-            INSERT INTO rules (rule_id, policy_id, rule_description)
-            VALUES (:rule_id, :policy_id, :rule_description)
-        """)
-        db.execute(insert_query, {
-            "rule_id": rule_id,
-            "policy_id": req.policy_id,
-            "rule_description": rule_description
-        })
-        db.commit()
-        return {
-            "code": 20000,
-            "data": {
-                "rule_id": rule_id,
-                "message": "规则创建成功"
-            }
-        }
-    except Exception as e:
-        db.rollback()
-        return {"code": 50000, "message": f"规则创建失败: {str(e)}"}
+# @app.post("/frontend/rules/create")
+# def create_rule(req: RuleCreateItem, db = Depends(get_db)):
+#     if req.rule_type not in RULE_MAPPING:
+#         return {"code": 40000, "message": "无效的规则类型"}
+#     rule_id = str(req.rule_type)
+#     rule_description = RULE_MAPPING[req.rule_type]["description"]
+#     try:
+#         policy_check = text("SELECT 1 FROM policy WHERE policy_id = :policy_id")
+#         if not db.execute(policy_check, {"policy_id": req.policy_id}).fetchone():
+#             return {"code": 40400, "message": "策略不存在"}
+#         rule_check = text("""
+#             SELECT 1 FROM rules 
+#             WHERE policy_id = :policy_id AND rule_description = :rule_description
+#         """)
+#         if db.execute(rule_check, {
+#             "policy_id": req.policy_id,
+#             "rule_description": rule_description
+#         }).fetchone():
+#             return {"code": 40000, "message": "该规则已存在"}
+#         insert_query = text("""
+#             INSERT INTO rules (rule_id, policy_id, rule_description)
+#             VALUES (:rule_id, :policy_id, :rule_description)
+#         """)
+#         db.execute(insert_query, {
+#             "rule_id": rule_id,
+#             "policy_id": req.policy_id,
+#             "rule_description": rule_description
+#         })
+#         db.commit()
+#         return {
+#             "code": 20000,
+#             "data": {
+#                 "rule_id": rule_id,
+#                 "message": "规则创建成功"
+#             }
+#         }
+#     except Exception as e:
+#         db.rollback()
+#         return {"code": 50000, "message": f"规则创建失败: {str(e)}"}
 
 # # 更新规则
 # class RuleUpdateItem(BaseModel):
