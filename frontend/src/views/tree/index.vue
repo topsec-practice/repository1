@@ -8,7 +8,7 @@
         clearable
         style="width: 200px; margin-right: 10px;"
       />
-      <el-button type="primary" @click="fetchData">查询</el-button>
+      <!-- <el-button type="primary" @click="fetchData">查询</el-button> -->
       <el-input
         v-model="filterText"
         placeholder="搜索规则ID、文件ID或用户ID"
