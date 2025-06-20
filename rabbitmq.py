@@ -115,18 +115,18 @@ def callback(ch, method, properties, body):
                     print(f" [×] 处理文件数据失败: {e}")
 
         elif flag == 3:
-            # 删除指定的 user_id + md5 及其匹配记录
+            # 删除指定的 user_id + file_name 及其匹配记录
             if "files" in data:
                 for file_data in data["files"]:
-                    file_id = file_data.get("md5")
+                    file_id = file_data.get("file_name")
                     if not file_id:
-                        print(" [×] file_id (md5) is required for each file in flag=3")
+                        print(" [×] file_id (file_name) is required for each file in flag=3")
                         continue
                     cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s", (user_id, file_id))
                     cursor.execute("DELETE FROM files WHERE user_id = %s AND file_id = %s", (user_id, file_id))
                     print(f" [i] 已删除 file_id = {file_id}, user_id = {user_id} 及其匹配记录")
             else:
-                file_id = data.get("md5")
+                file_id = data.get("file_name")
                 if not file_id:
                     raise ValueError("file_id is required for flag=3")
                 cursor.execute("DELETE FROM matches WHERE user_id = %s AND file_id = %s", (user_id, file_id))
@@ -147,7 +147,7 @@ def callback(ch, method, properties, body):
 def insert_file_and_matches(data):
     """插入文件记录和关联的匹配记录"""
     
-    data["file_id"] = data["md5"]
+    data["file_id"] = data["file_name"]
     
     sql = """
         INSERT INTO files (file_id, user_id, file_name, md5, discovery_time, count)
@@ -179,9 +179,9 @@ def insert_file_and_matches(data):
 
 def update_file_and_matches(data):
     """更新文件记录和关联的匹配记录"""
-    if "md5" not in data:
-        raise ValueError("data 必须包含 md5 字段")
-    data["file_id"] = data["md5"]
+    if "file_name" not in data:
+        raise ValueError("data 必须包含 file_name 字段")
+    data["file_id"] = data["file_name"]
     # 先删除旧匹配记录
     cursor.execute(
         "DELETE FROM matches WHERE user_id = %s AND file_id = %s",
@@ -192,7 +192,7 @@ def update_file_and_matches(data):
 
 def insert_or_update_file_and_matches(data):
     
-    data["file_id"] = data["md5"]
+    data["file_id"] = data["file_name"]
     cursor.execute("SELECT 1 FROM files WHERE user_id = %s AND file_id = %s",
                   (data["user_id"], data["file_id"]))
     if cursor.fetchone():

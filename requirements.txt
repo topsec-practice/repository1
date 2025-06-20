@@ -7,3 +7,4 @@ rstream
 SQLAlchemy
 websockets
 uvicorn
+influxdb_client

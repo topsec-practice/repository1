@@ -18,6 +18,7 @@ HEADERS = {"Authorization": f"Bearer {API_KEY}"}
 def send_heartbeat(user_id=USER_ID):
     """注册 + 上线 + 定时发送心跳"""
     data = {"user_id": user_id}
+    local_policy_id = 0  # 本地已知的最新策略版本号
 
     try:
         # 注册
@@ -42,7 +43,20 @@ def send_heartbeat(user_id=USER_ID):
     while True:
         try:
             hb_resp = requests.post(f"{REST_URL_BASE}/heartbeat", headers=HEADERS, json=data)
-            print(f"[REST] 心跳发送: {hb_resp.status_code} {hb_resp.json()}")
+            resp_json = hb_resp.json()
+            print(f"[REST] 心跳发送: {hb_resp.status_code} {resp_json}")
+
+            # 检查策略版本号
+            now_policy = resp_json.get("now_policy")
+            if now_policy is not None and now_policy > local_policy_id:
+                print(f"[REST] 检测到新策略版本: {now_policy}，请求最新策略...")
+                try:
+                    response = requests.post(PUSH_URL)
+                    print(f"[REST->WS] 请求策略结果: {response.json()}")
+                    # 更新本地策略版本号
+                    local_policy_id = now_policy
+                except Exception as e:
+                    print(f"[REST->WS] 策略请求失败: {e}")
         except Exception as e:
             print(f"[REST] 心跳失败: {e}")
         time.sleep(10)
