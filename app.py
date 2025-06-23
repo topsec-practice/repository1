@@ -204,11 +204,13 @@ def create_ws_app(clients):
         
         policy_id = sql.get_max_policyid(cursor)[0][0]
         rules = sql.get_all_rules(cursor, policy_id)
+        policy_path = sql.get_policy_path(cursor, policy_id)
         rules_id = [rule[0] for rule in rules]
 
         policy_data = {
             "type": "policy_update",
             "policy_id": policy_id,
+            "policy_path": policy_path,
             "rules": rules_id  # 只返回 rule_id 列表
         }
         try:

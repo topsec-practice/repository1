@@ -156,6 +156,16 @@ def get_all_rules(cursor, policy_id):
     except Exception as e:
         print(f"Error: {e}")
         return []
+    
+def get_policy_path(cursor, policy_id):
+    try:
+        sql = "SELECT policy_path FROM policy WHERE policy_id = %s"
+        cursor.execute(sql, (policy_id,))
+        result = cursor.fetchone()
+        return result[0]
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
 
 def get_all_users(cursor, admin_id):
     try:
