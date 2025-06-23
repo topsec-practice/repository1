@@ -115,3 +115,25 @@ CREATE TABLE `user`  (
 ) ENGINE = InnoDB CHARACTER SET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci ROW_FORMAT = Dynamic;
 
 SET FOREIGN_KEY_CHECKS = 1;
+INSERT INTO `rules` (`rule_id`,`rule_description`) VALUES
+  (1,phone),
+  (2,ip),
+  (3,mac),
+  (4,ipv6),
+  (5,bank_card),
+  (6,email),
+  (7,passport),
+  (8,id_number),
+  (9,gender),
+  (10,national),
+  (11,carnum),
+  (12,telephone),
+  (13,officer),
+  (14,HM_pass),
+  (15,jdbc),
+  (16,organization),
+  (17,business),
+  (18,credit),
+  (19,address_name);
+
+  
