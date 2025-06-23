@@ -28,6 +28,16 @@
             </el-checkbox>
           </el-checkbox-group>
         </el-form-item>
+
+        <el-form-item label="策略路径" prop="path">
+          <el-input
+            v-model="form.path"
+            type="textarea"
+            :rows="1"
+            placeholder="策略路径"
+            clearable
+          ></el-input>
+        </el-form-item>
         
         <el-form-item>
           <el-button 
@@ -71,6 +81,11 @@
           prop="description"
           label="策略描述"
         ></el-table-column>
+
+        <el-table-column
+          prop="path"
+          label="策略路径"
+        ></el-table-column>
         
         <el-table-column
           label="操作"
@@ -110,6 +125,7 @@ export default {
       // 策略提交模块数据
       form: {
         strategy: '',
+        path: '',
         selectedRules: []
       },
       rules: {
@@ -119,6 +135,13 @@ export default {
         ],
         selectedRules: [
           { type: 'array', required: true, message: '请至少选择一个规则', trigger: 'change' }
+        ],
+        strategy: [
+          { required: true, message: '请输入策略内容', trigger: 'blur' },
+          { max: 200, message: '策略内容不能超过200个字符', trigger: 'blur' }
+        ],
+        path: [
+          { required: true, trigger: 'blur'},
         ]
       },
       submitting: false,
@@ -176,11 +199,12 @@ export default {
     submitForm() {
       this.$refs.form.validate(valid => {
         if (valid) {
-          this.submitting = true
-          
+          this.submitting = true;
+          // alert(this.form.path);
           // 先提交策略
           submitStrategy({
                           strategy: this.form.strategy,
+                          path: this.form.path,
                           selectedRules: this.form.selectedRules
                         })
             .then(response => {

@@ -7,15 +7,16 @@ export function submitStrategy(data) {
     method: 'post',
     data: {
       strategy: data.strategy,
-      rule_types: data.selectedRules
+      rule_types: data.selectedRules,
+      path: data.path,
     }
-  })
-}
+  });
+};
 
 // 如果需要获取策略状态
-export function getStrategyStatus() {
-  return request({
-    url: '/frontend/strategy/status', // 替换为实际API地址
-    method: 'get'
-  })
-}
+// export function getStrategyStatus() {
+//   return request({
+//     url: '/frontend/strategy/status', // 替换为实际API地址
+//     method: 'get'
+//   })
+// }

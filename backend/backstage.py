@@ -153,6 +153,7 @@ def statusinfo(db = Depends(get_db)):
 # 修改策略提交接口，支持同时创建策略和规则
 class StrategyWithRulesItem(BaseModel):
     strategy: str
+    path: str
     rule_types: List[int]  # 新增字段，接收规则类型列表
 
 @app.post("/frontend/strategy/submit")
@@ -164,12 +165,13 @@ def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
     try:
         # 1. 插入策略
         insert_policy = text("""
-            INSERT INTO policy (policy_id, policy_description)
-            VALUES (:policy_id, :policy_description)
+            INSERT INTO policy (policy_id, policy_description, policy_path)
+            VALUES (:policy_id, :policy_description, :policy_path)
         """)
         db.execute(insert_policy, {
             "policy_id": policy_id,
-            "policy_description": req.strategy
+            "policy_description": req.strategy,
+            "policy_path": req.path,
         })
 
         # 2. 插入规则（如不存在）
@@ -201,21 +203,21 @@ def strategy_submit(req: StrategyWithRulesItem, db = Depends(get_db)):
             "code": 20000,
             "data": {
                 "message": "策略和规则提交成功",
-                "policy_id": policy_id
+                "policy_id": policy_id,
             }
         }
     except Exception as e:
         db.rollback()
         return {
             "code": 50000,
-            "message": f"提交失败: {str(e)}"
+            "message": f"提交失败: {str(e)}",
         }
 
-@app.post("/frontend/strategy/statu")
-def strategy_submit():
-    return  {   "code":20000
-            ,   "data":"success"
-            }
+# @app.post("/frontend/strategy/statu")
+# def strategy_submit():
+#     return  {   "code":20000
+#             ,   "data":"success"
+#             }
 
 @app.get("/frontend/matches/list")
 def matches_list(user_id: str, db = Depends(get_db)):
@@ -272,7 +274,8 @@ def policy_list(
     query = text("""
         SELECT 
             policy_id,
-            policy_description
+            policy_description,
+            policy_path
         FROM policy
     """)
     
@@ -282,10 +285,12 @@ def policy_list(
         query = text("""
             SELECT 
                 policy_id,
-                policy_description
+                policy_description,
+                policy_path
             FROM policy
             WHERE policy_id LIKE :search 
             OR policy_description LIKE :search
+            OR policy_path LIKE :search
         """)
         params["search"] = f"%{search}%"
     result = db.execute(query, params)
@@ -294,6 +299,7 @@ def policy_list(
         policies.append({
             "policy_id": row.policy_id,
             "description": row.policy_description,
+            "path": row.policy_path
         })
     
     return {

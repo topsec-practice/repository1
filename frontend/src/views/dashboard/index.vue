@@ -25,7 +25,7 @@
     >
       <el-table-column prop="id" label="用户ID" align="center" />
       <el-table-column prop="name" label="用户名" align="center" />
-      <el-table-column prop="key" label="用户密码" align="center" />
+      <!-- <el-table-column prop="key" label="用户密码" align="center" /> -->
       <el-table-column prop="LastEchoTime" label="最后登录时间" align="center" />
       <el-table-column prop="LastScanTime" label="最后扫描时间" align="center" />
       <el-table-column prop="IP" label="ip" align="center" />
