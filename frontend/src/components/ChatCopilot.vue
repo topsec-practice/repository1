@@ -129,7 +129,7 @@ export default {
       this.scrollToBottom();
 
       const payload = { messages: this.chatHistory.filter(m => !m.isError) }; // 不将错误消息发送给后端
-      const url = "http://127.0.0.1:16361/chat";
+      const url = "http://124.221.85.122:16361/chat";
       this.abortController = new AbortController();
 
       try {
@@ -197,7 +197,7 @@ export default {
     },
 
     getDownloadUrl(filename) {
-      return `http://127.0.0.1:16361/download?filename=${encodeURIComponent(filename)}`;
+      return `http://124.221.85.122:16361/download?filename=${encodeURIComponent(filename)}`;
     },
 
     renderMarkdown(text) {
